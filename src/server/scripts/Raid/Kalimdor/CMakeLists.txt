@@ -1,18 +1,18 @@
 # LegacyV3
 
-message(" - - - BattleForMountHyjal")
+message(" - - - Battle For Mount Hyjal")
 file(GLOB_RECURSE sources_BattleForMountHyjal Raid/Kalimdor/BattleForMountHyjal/*.cpp Raid/Kalimdor/BattleForMountHyjal/*.h)
 source_group("Dungeon\\BattleForMountHyjal" FILES ${sources_BattleForMountHyjal})
 
-message(" - - - OnyxiasLair")
+message(" - - - Onyxias Lair")
 file(GLOB_RECURSE sources_OnyxiasLair Raid/Kalimdor/OnyxiasLair/*.cpp Raid/Kalimdor/OnyxiasLair/*.h)
 source_group("Dungeon\\OnyxiasLair" FILES ${sources_OnyxiasLair})
 
-message(" - - - RuinsOfAhnQiraj")
+message(" - - - Ruins Of Ahn'Qiraj")
 file(GLOB_RECURSE sources_RuinsOfAhnQiraj Raid/Kalimdor/RuinsOfAhnQiraj/*.cpp Raid/Kalimdor/RuinsOfAhnQiraj/*.h)
 source_group("Dungeon\\RuinsOfAhnQiraj" FILES ${sources_RuinsOfAhnQiraj})
 
-message(" - - - TempleOfAhnQiraj")
+message(" - - - Temple Of Ahn'Qiraj")
 file(GLOB_RECURSE sources_TempleOfAhnQiraj Raid/Kalimdor/TempleOfAhnQiraj/*.cpp Raid/Kalimdor/TempleOfAhnQiraj/*.h)
 source_group("Dungeon\\TempleOfAhnQiraj" FILES ${sources_TempleOfAhnQiraj})
 

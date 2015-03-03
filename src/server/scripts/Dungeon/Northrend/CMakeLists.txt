@@ -8,27 +8,27 @@ message(" - - - AzjolNerub")
 file(GLOB_RECURSE sources_AzjolNerub Dungeon/Northrend/AzjolNerub/*.cpp Dungeon/Northrend/AzjolNerub/*.h)
 source_group("Dungeon\\AzjolNerub" FILES ${sources_AzjolNerub})
 
-message(" - - - DraktharonKeep")
+message(" - - - Draktharon Keep")
 file(GLOB_RECURSE sources_DraktharonKeep Dungeon/Northrend/DraktharonKeep/*.cpp Dungeon/Northrend/DraktharonKeep/*.h)
 source_group("Dungeon\\DraktharonKeep" FILES ${sources_DraktharonKeep})
 
-message(" - - - ForgeOfSouls")
+message(" - - - Forge Of Souls")
 file(GLOB_RECURSE sources_ForgeOfSouls Dungeon/Northrend/ForgeOfSouls/*.cpp Dungeon/Northrend/ForgeOfSouls/*.h)
 source_group("Dungeon\\ForgeOfSouls" FILES ${sources_ForgeOfSouls})
 
-message(" - - - Gundrak")
+message(" - - - Gun'drak")
 file(GLOB_RECURSE sources_Gundrak Dungeon/Northrend/Gundrak/*.cpp Dungeon/Northrend/Gundrak/*.h)
 source_group("Dungeon\\Gundrak" FILES ${sources_Gundrak})
 
-message(" - - - HallsOfLightning")
+message(" - - - Halls Of Lightning")
 file(GLOB_RECURSE sources_HallsOfLightning Dungeon/Northrend/HallsOfLightning/*.cpp Dungeon/Northrend/HallsOfLightning/*.h)
 source_group("Dungeon\\HallsOfLightning" FILES ${sources_HallsOfLightning})
 
-message(" - - - HallsOfReflection")
+message(" - - - Halls Of Reflection")
 file(GLOB_RECURSE sources_HallsOfReflection Dungeon/Northrend/HallsOfReflection/*.cpp Dungeon/Northrend/HallsOfReflection/*.h)
 source_group("Dungeon\\HallsOfReflection" FILES ${sources_HallsOfReflection})
 
-message(" - - - HallsOfStone")
+message(" - - - Halls Of Stone")
 file(GLOB_RECURSE sources_HallsOfStone Dungeon/Northrend/HallsOfStone/*.cpp Dungeon/Northrend/HallsOfStone/*.h)
 source_group("Dungeon\\HallsOfStone" FILES ${sources_HallsOfStone})
 
@@ -40,23 +40,23 @@ message(" - - - Oculus")
 file(GLOB_RECURSE sources_Oculus Dungeon/Northrend/Oculus/*.cpp Dungeon/Northrend/Oculus/*.h)
 source_group("Dungeon\\Oculus" FILES ${sources_Oculus})
 
-message(" - - - PitOfSaron")
+message(" - - - Pit Of Saron")
 file(GLOB_RECURSE sources_PitOfSaron Dungeon/Northrend/PitOfSaron/*.cpp Dungeon/Northrend/PitOfSaron/*.h)
 source_group("Dungeon\\PitOfSaron" FILES ${sources_PitOfSaron})
 
-message(" - - - RubySanctum")
+message(" - - - Ruby Sanctum")
 file(GLOB_RECURSE sources_RubySanctum Dungeon/Northrend/RubySanctum/*.cpp Dungeon/Northrend/RubySanctum/*.h)
 source_group("Dungeon\\RubySanctum" FILES ${sources_RubySanctum})
 
-message(" - - - UtgardeKeep")
+message(" - - - Utgarde Keep")
 file(GLOB_RECURSE sources_UtgardeKeep Dungeon/Northrend/UtgardeKeep/*.cpp Dungeon/Northrend/UtgardeKeep/*.h)
 source_group("Dungeon\\UtgardeKeep" FILES ${sources_UtgardeKeep})
 
-message(" - - - UtgardePinnacle")
+message(" - - - Utgarde Pinnacle")
 file(GLOB_RECURSE sources_UtgardePinnacle Dungeon/Northrend/UtgardePinnacle/*.cpp Dungeon/Northrend/UtgardePinnacle/*.h)
 source_group("Dungeon\\UtgardePinnacle" FILES ${sources_UtgardePinnacle})
 
-message(" - - - VioletHold")
+message(" - - - Violet Hold")
 file(GLOB_RECURSE sources_VioletHold Dungeon/Northrend/VioletHold/*.cpp Dungeon/Northrend/VioletHold/*.h)
 source_group("Dungeon\\VioletHold" FILES ${sources_VioletHold})
 
