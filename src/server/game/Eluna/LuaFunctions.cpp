@@ -635,6 +635,7 @@ ElunaRegister<Player> PlayerMethods[] =
 
     // Gossip
     { "GossipMenuAddItem", &LuaPlayer::GossipMenuAddItem },                               // :GossipMenuAddItem(icon, msg, sender, intid[, code, popup, money])
+    { "GossipMenuAddDBItem", &LuaPlayer::GossipMenuAddDBItem },
     { "GossipSendMenu", &LuaPlayer::GossipSendMenu },                                     // :GossipSendMenu(npc_text, unit[, menu_id]) - If unit is a player, you need to use a menu_id. menu_id is used to hook the gossip select function to the menu
     { "GossipComplete", &LuaPlayer::GossipComplete },                                     // :GossipComplete()
     { "GossipClearMenu", &LuaPlayer::GossipClearMenu },                                   // :GossipClearMenu() - Clears the gossip menu of options. Pretty much only useful with player gossip. Need to use before creating a new menu for the player

@@ -396,6 +396,7 @@ struct TrainerSpell
     uint32 reqSkill;
     uint32 reqSkillValue;
     uint32 reqLevel;
+    uint32 reqCityRank;
     uint32 learnedSpell[3];
 
     // helpers

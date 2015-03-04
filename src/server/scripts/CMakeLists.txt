@@ -29,7 +29,6 @@ set(scripts_STAT_SRCS
 if(SCRIPTS)
   message("Game Scripts")
   include(Zone/CMakeLists.txt)
-  
   include(Dungeon/CMakeLists.txt)
   include(Raid/CMakeLists.txt)
   include(Battleground/CMakeLists.txt)
@@ -134,9 +133,11 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Skills
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells/Auras
+  ${CMAKE_SOURCE_DIR}/src/server/game/Supremacy
   ${CMAKE_SOURCE_DIR}/src/server/game/Texts
   ${CMAKE_SOURCE_DIR}/src/server/game/Tickets
   ${CMAKE_SOURCE_DIR}/src/server/game/Tools
+  ${CMAKE_SOURCE_DIR}/src/server/game/Transmogrification
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden/Modules
   ${CMAKE_SOURCE_DIR}/src/server/game/WarSchool

@@ -168,6 +168,7 @@ class GossipMenu
 
         void AddMenuItem(int32 menuItemId, uint8 icon, std::string const& message, uint32 sender, uint32 action, std::string const& boxMessage, uint32 boxMoney, bool coded = false, bool singleTimeCheck = false);
         void AddMenuItem(uint32 menuId, uint32 menuItemId, uint32 sender, uint32 action);
+        void AddMenuItem(int32 menuItemId, uint8 icon, uint32 messageBroadcastTextId, uint32 sender, uint32 action, uint32 boxMessageBroadcastTextId, uint32 boxMoney, bool coded = false, bool singleTimeCheck = false);
 
         void SetMenuId(uint32 menu_id) { _menuId = menu_id; }
         uint32 GetMenuId() const { return _menuId; }

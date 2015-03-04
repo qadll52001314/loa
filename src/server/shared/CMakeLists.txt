@@ -13,23 +13,34 @@ if( USE_COREPCH )
 endif()
 
 file(GLOB_RECURSE sources_Configuration Configuration/*.cpp Configuration/*.h)
+source_group("Configuration" FILES ${sources_Configuration})
 file(GLOB_RECURSE sources_Cryptography Cryptography/*.cpp Cryptography/*.h)
+source_group("Cryptography" FILES ${sources_Cryptography})
 file(GLOB_RECURSE sources_Database Database/*.cpp Database/*.h)
+source_group("Database" FILES ${sources_Database})
 file(GLOB_RECURSE sources_DataStores DataStores/*.cpp DataStores/*.h)
+source_group("DataStores" FILES ${sources_DataStores})
 file(GLOB_RECURSE sources_Dynamic Dynamic/*.cpp Dynamic/*.h)
+source_group("Dynamic" FILES ${sources_Dynamic})
 file(GLOB_RECURSE sources_Logging Logging/*.cpp Logging/*.h)
+source_group("Logging" FILES ${sources_Logging})
 file(GLOB_RECURSE sources_Networking Networking/*.cpp Networking/*.h)
+source_group("Networking" FILES ${sources_Networking})
 file(GLOB_RECURSE sources_Packets Packets/*.cpp Packets/*.h)
+source_group("Packets" FILES ${sources_Packets})
 file(GLOB_RECURSE sources_Threading Threading/*.cpp Threading/*.h)
+source_group("Threading" FILES ${sources_Threading})
 file(GLOB_RECURSE sources_Utilities Utilities/*.cpp Utilities/*.h)
+source_group("Utilities" FILES ${sources_Utilities})
 
 file(GLOB sources_localdir *.cpp *.h)
+source_group("Shared" FILES ${sources_localdir})
 
 # Manually set sources for Debugging directory as we don't want to include WheatyExceptionReport in shared project
 # It needs to be included both in authserver and worldserver for the static global variable to be properly initialized
 # and to handle crash logs on windows
 set(sources_Debugging Debugging/Errors.cpp Debugging/Errors.h)
-
+source_group("Debugging" FILES ${sources_Debugging})
 #
 # Build shared sourcelist
 #

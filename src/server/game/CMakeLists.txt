@@ -128,6 +128,9 @@ source_group("Skills" FILES ${sources_Skills})
 message(" - Spells")
 file(GLOB_RECURSE sources_Spells Spells/*.cpp Spells/*.h)
 source_group("Spells" FILES ${sources_Spells})
+message(" - Supremacy")
+file(GLOB_RECURSE sources_Supremacy Supremacy/*.cpp Supremacy/*.h)
+source_group("Supremacy" FILES ${sources_Supremacy})
 message(" - Texts")
 file(GLOB_RECURSE sources_Texts Texts/*.cpp Texts/*.h)
 source_group("Texts" FILES ${sources_Texts})
@@ -137,6 +140,9 @@ source_group("Tools" FILES ${sources_Tools})
 message(" - Tickets")
 file(GLOB_RECURSE sources_Tickets Tickets/*.cpp Tickets/*.h)
 source_group("Tickets" FILES ${sources_Tickets})
+message(" - Transmogrification")
+file(GLOB_RECURSE sources_Transmogrification Transmogrification/*.cpp Transmogrification/*.h)
+source_group("Transmogrification" FILES ${sources_Transmogrification})
 message(" - Warden")
 file(GLOB_RECURSE sources_Warden Warden/*.cpp Warden/*.h)
 source_group("Warden" FILES ${sources_Warden})
@@ -199,9 +205,11 @@ set(game_STAT_SRCS
   ${sources_Server}
   ${sources_Skills}
   ${sources_Spells}
+  ${sources_Supremacy}
   ${sources_Texts}
   ${sources_Tools}
   ${sources_Tickets}
+  ${sources_Transmogrification}
   ${sources_Warden}
   ${sources_WarSchool}
   ${sources_Weather}
@@ -303,9 +311,11 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Skills
   ${CMAKE_CURRENT_SOURCE_DIR}/Spells
   ${CMAKE_CURRENT_SOURCE_DIR}/Spells/Auras
+  ${CMAKE_CURRENT_SOURCE_DIR}/Supremacy
   ${CMAKE_CURRENT_SOURCE_DIR}/Texts
   ${CMAKE_CURRENT_SOURCE_DIR}/Tools
   ${CMAKE_CURRENT_SOURCE_DIR}/Tickets
+  ${CMAKE_CURRENT_SOURCE_DIR}/Transmogrification
   ${CMAKE_CURRENT_SOURCE_DIR}/Warden
   ${CMAKE_CURRENT_SOURCE_DIR}/Warden/Modules
   ${CMAKE_CURRENT_SOURCE_DIR}/WarSchool

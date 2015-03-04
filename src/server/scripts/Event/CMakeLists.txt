@@ -8,10 +8,10 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-file(GLOB_RECURSE sources_Events Events/*.cpp Events/*.h)
-source_group("Event" FILES ${scripts_Events})
+file(GLOB_RECURSE scripts_Event Event/*.cpp Event/*.h)
+source_group("Event" FILES ${scripts_Event})
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  ${scripts_Events}
+  ${scripts_Event}
 )

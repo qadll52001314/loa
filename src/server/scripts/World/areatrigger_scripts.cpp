@@ -473,6 +473,19 @@ private:
     ObjectGuid stormforgedEradictorGUID;
 };
 
+class areatrigger_at_undercity_entrance : public AreaTriggerScript
+{
+public:
+    areatrigger_at_undercity_entrance() : AreaTriggerScript("at_undercity_entrance") { }
+
+    bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
+    {
+        if (!player->HasAura(81465))
+            player->CastSpell(player, 81465, true);
+        return false;
+    }
+};
+
 void AddSC_areatrigger_scripts()
 {
     new AreaTrigger_at_coilfang_waterfall();
@@ -485,4 +498,5 @@ void AddSC_areatrigger_scripts()
     new AreaTrigger_at_brewfest();
     new AreaTrigger_at_area_52_entrance();
     new AreaTrigger_at_frostgrips_hollow();
+    new areatrigger_at_undercity_entrance();
 }

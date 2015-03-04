@@ -303,17 +303,8 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
             }
             else
             {
-                text0[i] = gossip->Options[i].Text_0;
-                text1[i] = gossip->Options[i].Text_1;
-            }
-
-            if (locale != DEFAULT_LOCALE && !bct)
-            {
-                if (NpcTextLocale const* npcTextLocale = sObjectMgr->GetNpcTextLocale(textID))
-                {
-                    ObjectMgr::GetLocaleString(npcTextLocale->Text_0[i], locale, text0[i]);
-                    ObjectMgr::GetLocaleString(npcTextLocale->Text_1[i], locale, text1[i]);
-                }
+                text0[i] = "";
+                text1[i] = "";
             }
 
             data << gossip->Options[i].Probability;
@@ -328,13 +319,14 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
             else
                 data << text1[i];
 
-            data << gossip->Options[i].Language;
+            data << bct->Language;
 
-            for (uint8 j = 0; j < MAX_GOSSIP_TEXT_EMOTES; ++j)
-            {
-                data << gossip->Options[i].Emotes[j]._Delay;
-                data << gossip->Options[i].Emotes[j]._Emote;
-            }
+            data << bct->EmoteDelay0;
+            data << bct->EmoteId0;
+            data << bct->EmoteDelay1;
+            data << bct->EmoteId1;
+            data << bct->EmoteDelay2;
+            data << bct->EmoteId2;
         }
     }
 

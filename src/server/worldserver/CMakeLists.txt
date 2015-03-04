@@ -86,12 +86,14 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Battlegrounds
   ${CMAKE_SOURCE_DIR}/src/server/game/Battlegrounds/Zones
   ${CMAKE_SOURCE_DIR}/src/server/game/Calendar
+  ${CMAKE_SOURCE_DIR}/src/server/game/CapitalCity
   ${CMAKE_SOURCE_DIR}/src/server/game/Chat
   ${CMAKE_SOURCE_DIR}/src/server/game/Chat/Channels
   ${CMAKE_SOURCE_DIR}/src/server/game/Combat
   ${CMAKE_SOURCE_DIR}/src/server/game/Conditions
   ${CMAKE_SOURCE_DIR}/src/server/game/DataStores
   ${CMAKE_SOURCE_DIR}/src/server/game/DungeonFinding
+  ${CMAKE_SOURCE_DIR}/src/server/game/Eluna
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/Creature
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/Corpse
@@ -128,21 +130,21 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/PrecompiledHeaders
   ${CMAKE_SOURCE_DIR}/src/server/game/Quests
   ${CMAKE_SOURCE_DIR}/src/server/game/Reputation
+  ${CMAKE_SOURCE_DIR}/src/server/game/ResourcePoint
   ${CMAKE_SOURCE_DIR}/src/server/game/Scripting
   ${CMAKE_SOURCE_DIR}/src/server/game/Server/Protocol
   ${CMAKE_SOURCE_DIR}/src/server/game/Server
   ${CMAKE_SOURCE_DIR}/src/server/game/Skills
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells/Auras
+  ${CMAKE_SOURCE_DIR}/src/server/game/Supremacy
   ${CMAKE_SOURCE_DIR}/src/server/game/Tools
+  ${CMAKE_SOURCE_DIR}/src/server/game/Transmogrification
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden/Modules
+  ${CMAKE_SOURCE_DIR}/src/server/game/WarSchool
   ${CMAKE_SOURCE_DIR}/src/server/game/Weather
   ${CMAKE_SOURCE_DIR}/src/server/game/World
-  ${CMAKE_SOURCE_DIR}/src/server/game/CapitalCity
-  ${CMAKE_SOURCE_DIR}/src/server/game/ResourcePoint
-  ${CMAKE_SOURCE_DIR}/src/server/game/WarSchool
-  ${CMAKE_SOURCE_DIR}/src/server/game/Eluna
   ${CMAKE_SOURCE_DIR}/src/server/authserver/Server
   ${CMAKE_SOURCE_DIR}/src/server/authserver/Realms
   ${CMAKE_CURRENT_SOURCE_DIR}

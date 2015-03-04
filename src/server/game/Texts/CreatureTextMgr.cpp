@@ -99,24 +99,12 @@ void CreatureTextMgr::LoadCreatureTexts()
         temp.entry           = fields[0].GetUInt32();
         temp.group           = fields[1].GetUInt8();
         temp.id              = fields[2].GetUInt8();
-        temp.text            = fields[3].GetString();
-        temp.type            = ChatMsg(fields[4].GetUInt8());
-        temp.lang            = Language(fields[5].GetUInt8());
-        temp.probability     = fields[6].GetFloat();
-        temp.emote           = Emote(fields[7].GetUInt32());
-        temp.duration        = fields[8].GetUInt32();
-        temp.sound           = fields[9].GetUInt32();
-        temp.BroadcastTextId = fields[10].GetUInt32();
-        temp.TextRange       = CreatureTextRange(fields[11].GetUInt8());
-
-        if (temp.sound)
-        {
-            if (!sSoundEntriesStore.LookupEntry(temp.sound))
-            {
-                TC_LOG_ERROR("sql.sql", "CreatureTextMgr: Entry %u, Group %u in table `creature_text` has Sound %u but sound does not exist.", temp.entry, temp.group, temp.sound);
-                temp.sound = 0;
-            }
-        }
+        temp.type            = ChatMsg(fields[3].GetUInt8());
+        temp.lang            = Language(fields[4].GetUInt8());
+        temp.probability     = fields[5].GetFloat();
+        temp.duration        = fields[6].GetUInt32();
+        temp.BroadcastTextId = fields[7].GetUInt32();
+        temp.TextRange       = CreatureTextRange(fields[8].GetUInt8());
 
         if (!GetLanguageDescByID(temp.lang))
         {
@@ -128,15 +116,6 @@ void CreatureTextMgr::LoadCreatureTexts()
         {
             TC_LOG_ERROR("sql.sql", "CreatureTextMgr: Entry %u, Group %u in table `creature_text` has Type %u but this Chat Type does not exist.", temp.entry, temp.group, uint32(temp.type));
             temp.type = CHAT_MSG_SAY;
-        }
-
-        if (temp.emote)
-        {
-            if (!sEmotesStore.LookupEntry(temp.emote))
-            {
-                TC_LOG_ERROR("sql.sql", "CreatureTextMgr: Entry %u, Group %u in table `creature_text` has Emote %u but emote does not exist.", temp.entry, temp.group, uint32(temp.emote));
-                temp.emote = EMOTE_ONESHOT_NONE;
-            }
         }
 
         if (temp.BroadcastTextId)
@@ -273,7 +252,11 @@ uint32 CreatureTextMgr::SendChat(Creature* source, uint8 textGroup, WorldObject 
 
     ChatMsg finalType = (msgType == CHAT_MSG_ADDON) ? iter->type : msgType;
     Language finalLang = (language == LANG_ADDON) ? iter->lang : language;
-    uint32 finalSound = sound ? sound : iter->sound;
+    BroadcastText const* broadcastText = sObjectMgr->GetBroadcastText(iter->BroadcastTextId);
+    uint32 broadcastSound = 0;
+    if (broadcastText)
+        broadcastSound = broadcastText->SoundId;
+    uint32 finalSound = sound ? sound : broadcastSound;
 
     if (range == TEXT_RANGE_NORMAL)
         range = iter->TextRange;
@@ -285,8 +268,11 @@ uint32 CreatureTextMgr::SendChat(Creature* source, uint8 textGroup, WorldObject 
     if (srcPlr)
         finalSource = srcPlr;
 
-    if (iter->emote)
-        SendEmote(finalSource, iter->emote);
+    uint32 broadcastEmote = 0;
+    if (broadcastText)
+        broadcastEmote = broadcastText->EmoteId0;
+    if (broadcastEmote)
+        SendEmote(finalSource, broadcastEmote);
 
     if (srcPlr)
     {
@@ -498,7 +484,7 @@ std::string CreatureTextMgr::GetLocalizedChatString(uint32 entry, uint8 gender, 
     if (bct)
         baseText = bct->GetText(locale, gender);
     else
-        baseText = groupItr->text;
+        baseText = "";
 
     if (locale != DEFAULT_LOCALE && !bct)
     {

@@ -563,7 +563,6 @@ struct GossipMenuItems
     uint32          MenuId;
     uint32          OptionIndex;
     uint8           OptionIcon;
-    std::string     OptionText;
     uint32          OptionBroadcastTextId;
     uint32          OptionType;
     uint32          OptionNpcflag;
@@ -571,7 +570,6 @@ struct GossipMenuItems
     uint32          ActionPoiId;
     bool            BoxCoded;
     uint32          BoxMoney;
-    std::string     BoxText;
     uint32          BoxBroadcastTextId;
     ConditionList   Conditions;
     bool            SingleTimeCheck;
@@ -1030,7 +1028,7 @@ class ObjectMgr
 
         void LoadVendors();
         void LoadTrainerSpell();
-        void AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, uint32 reqSkill, uint32 reqSkillValue, uint32 reqLevel);
+        void AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, uint32 reqSkill, uint32 reqSkillValue, uint32 reqLevel, uint32 reqCityRank);
 
         std::string GeneratePetName(uint32 entry);
         uint32 GetBaseXP(uint8 level);

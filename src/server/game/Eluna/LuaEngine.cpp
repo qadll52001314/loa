@@ -90,7 +90,8 @@ void Eluna::LoadScriptPaths()
     if (!lua_requirepath.empty())
         lua_requirepath.erase(lua_requirepath.end() - 1);
 
-    ELUNA_LOG_DEBUG("[Eluna]: Loaded %u scripts in %u ms", uint32(lua_scripts.size() + lua_extensions.size()), ElunaUtil::GetTimeDiff(oldMSTime));
+    //ELUNA_LOG_INFO("[Eluna]: Loaded %u scripts in %u ms", uint32(lua_scripts.size() + lua_extensions.size()), ElunaUtil::GetTimeDiff(oldMSTime));
+    TC_LOG_INFO("server.loading", "[Eluna]: Loaded %u scripts in %u ms", uint32(lua_scripts.size() + lua_extensions.size()), ElunaUtil::GetTimeDiff(oldMSTime));
 }
 
 void Eluna::_ReloadEluna()
@@ -632,7 +633,7 @@ void Eluna::Push(lua_State* luastate, const int i)
 }
 void Eluna::Push(lua_State* luastate, const unsigned int u)
 {
-    lua_pushunsigned(luastate, u);
+    lua_pushinteger(luastate, u);
 }
 void Eluna::Push(lua_State* luastate, const double d)
 {

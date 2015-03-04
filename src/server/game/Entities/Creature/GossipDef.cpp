@@ -99,13 +99,13 @@ void GossipMenu::AddMenuItem(uint32 menuId, uint32 menuItemId, uint32 sender, ui
         if (optionBroadcastText)
             strOptionText = optionBroadcastText->GetText(GetLocale());
         else
-            strOptionText = itr->second.OptionText;
+            strOptionText = "<error>";
 
         /// BoxText
         if (boxBroadcastText)
             strBoxText = boxBroadcastText->GetText(GetLocale());
         else
-            strBoxText = itr->second.BoxText;
+            strBoxText = "<error>";
 
         /// Check need of localization.
         if (GetLocale() != DEFAULT_LOCALE)
@@ -128,6 +128,42 @@ void GossipMenu::AddMenuItem(uint32 menuId, uint32 menuItemId, uint32 sender, ui
         /// Add menu item with existing method. Menu item id -1 is also used in ADD_GOSSIP_ITEM macro.
         AddMenuItem(-1, itr->second.OptionIcon, strOptionText, sender, action, strBoxText, itr->second.BoxMoney, itr->second.BoxCoded, itr->second.SingleTimeCheck);
     }
+}
+
+void GossipMenu::AddMenuItem(int32 menuItemId, uint8 icon, uint32 messageBroadcastTextId, uint32 sender, uint32 action, uint32 boxMessageBroadcastTextId, uint32 boxMoney, bool coded /*= false*/, bool singleTimeCheck /*= false*/)
+{
+    if (_menuItems.size() > GOSSIP_MAX_MENU_ITEMS)
+        return; // dont assert as lua scripting is engined by this.
+
+    // Find a free new id - script case
+    if (menuItemId == -1)
+    {
+        menuItemId = 0;
+        if (!_menuItems.empty())
+        {
+            for (GossipMenuItemContainer::const_iterator itr = _menuItems.begin(); itr != _menuItems.end(); ++itr)
+            {
+                if (int32(itr->first) > menuItemId)
+                    break;
+
+                menuItemId = itr->first + 1;
+            }
+        }
+    }
+
+    GossipMenuItem& menuItem = _menuItems[menuItemId];
+
+    BroadcastText const* msg = sObjectMgr->GetBroadcastText(messageBroadcastTextId);
+    BroadcastText const* boxMsg = sObjectMgr->GetBroadcastText(boxMessageBroadcastTextId);
+
+    menuItem.MenuItemIcon = icon;
+    menuItem.Message = msg ? msg->GetText(GetLocale()) : "";
+    menuItem.IsCoded = coded;
+    menuItem.Sender = sender;
+    menuItem.OptionType = action;
+    menuItem.BoxMessage = boxMsg ? boxMsg->GetText(GetLocale()) : "";
+    menuItem.BoxMoney = boxMoney;
+    menuItem.SingleTimeCheck = singleTimeCheck;
 }
 
 void GossipMenu::AddGossipMenuItemData(uint32 menuItemId, uint32 gossipActionMenuId, uint32 gossipActionPoi)

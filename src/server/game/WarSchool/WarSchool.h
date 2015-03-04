@@ -1,6 +1,9 @@
 #ifndef WAR_SCHOOL_H_
 #define WAR_SCHOOL_H_
 
+#include "Common.h"
+#include "SharedDefines.h"
+
 struct WarSchool
 {
     std::string Name;

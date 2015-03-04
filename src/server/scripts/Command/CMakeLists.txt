@@ -9,10 +9,10 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 message(" - Command")
-file(GLOB_RECURSE sources_Commands Commands/*.cpp Commands/*.h)
-source_group("Command" FILES ${sources_Commands})
+file(GLOB_RECURSE sources_Command Command/*.cpp Command/*.h)
+source_group("Command" FILES ${sources_Command})
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  ${sources_Commands}
+  ${sources_Command}
 )

@@ -1,5 +1,6 @@
 #include "CapitalCityMgr.h"
 #include "ScriptMgr.h"
+#include "ObjectMgr.h"
 
 void CapitalCityMgr::LoadCapitalCities()
 {

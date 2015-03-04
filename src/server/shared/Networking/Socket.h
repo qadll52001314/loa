@@ -34,9 +34,10 @@
 using boost::asio::ip::tcp;
 
 #define READ_BLOCK_SIZE 4096
-#ifdef BOOST_ASIO_HAS_IOCP
-#define TC_SOCKET_USE_IOCP
-#endif
+//#ifdef BOOST_ASIO_HAS_IOCP
+//#define TC_SOCKET_USE_IOCP
+//#endif
+#define TC_SOCKET_USE_IOCP BOOST_ASIO_HAS_IOCP
 
 template<class T>
 class Socket : public std::enable_shared_from_this<T>

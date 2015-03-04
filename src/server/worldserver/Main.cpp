@@ -49,9 +49,7 @@
 #include "WorldSocketMgr.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
-#ifdef ELUNA
 #include "LuaEngine.h"
-#endif
 
 using namespace boost::program_options;
 
@@ -172,7 +170,7 @@ int mainImpl(int argc, char** argv)
     signals.async_wait(SignalHandler);
 
     // Start the Boost based thread pool
-    int numThreads = sConfigMgr->GetIntDefault("ThreadPool", 1);
+    int numThreads = sConfigMgr->GetIntDefault("ThreadPool", 2);
     std::vector<std::thread> threadPool;
 
     if (numThreads < 1)
@@ -265,9 +263,7 @@ int mainImpl(int argc, char** argv)
     xCapitalCityMgr->Save();
     xResourcePointMgr->Save();
 
-#ifdef ELUNA
     Eluna::Uninitialize();
-#endif
 
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realmID);

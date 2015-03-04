@@ -2957,12 +2957,13 @@ namespace LuaPlayer
     int GossipMenuAddItem(Eluna* /*E*/, lua_State* L, Player* player)
     {
         uint32 _icon = Eluna::CHECKVAL<uint32>(L, 2);
-        const char* msg = Eluna::CHECKVAL<const char*>(L, 3);
+        uint32 msgId = Eluna::CHECKVAL<uint32>(L, 3);
         uint32 _sender = Eluna::CHECKVAL<uint32>(L, 4);
         uint32 _intid = Eluna::CHECKVAL<uint32>(L, 5);
         bool _code = Eluna::CHECKVAL<bool>(L, 6, false);
-        const char* _promptMsg = Eluna::CHECKVAL<const char*>(L, 7, "");
+        uint32 boxMsgId = Eluna::CHECKVAL<uint32>(L, 7, 0);
         uint32 _money = Eluna::CHECKVAL<uint32>(L, 8, 0);
+        bool singleTimeCheck = Eluna::CHECKVAL(L, 9, false);
 #ifndef TRINITY
 #ifndef CLASSIC
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(_icon, msg, _sender, _intid, _promptMsg, _money, _code);
@@ -2970,8 +2971,18 @@ namespace LuaPlayer
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(_icon, msg, _sender, _intid, _promptMsg, _code);
 #endif
 #else
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(-1, _icon, msg, _sender, _intid, _promptMsg, _money, _code);
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(-1, _icon, msgId, _sender, _intid, boxMsgId, _money, _code, singleTimeCheck);
 #endif
+        return 0;
+    }
+
+    int GossipMenuAddDBItem(Eluna*, lua_State* L, Player* player)
+    {
+        uint32 menuId = Eluna::CHECKVAL<uint32>(L, 2);
+        uint32 menuItemId = Eluna::CHECKVAL<uint32>(L, 3);
+        uint32 menuSender = Eluna::CHECKVAL<uint32>(L, 4);
+        uint32 menuAction = Eluna::CHECKVAL<uint32>(L, 5);
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuId, menuItemId, menuSender, menuAction);
         return 0;
     }
 

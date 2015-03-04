@@ -86,9 +86,7 @@
 #include "WorldSession.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
-#ifdef ELUNA
 #include "LuaEngine.h"
-#endif
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -1243,6 +1241,10 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
         }
     }
     // all item positions resolved
+
+    // add starter quest
+    if (Quest const* quest = sObjectMgr->GetQuestTemplate(26036))
+        AddQuestAndCheckCompletion(quest, NULL);
 
     return true;
 }
@@ -5176,9 +5178,7 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
     // update visibility
     UpdateObjectVisibility();
 
-#ifdef ELUNA
     sEluna->OnResurrect(this);
-#endif
 
     if (!applySickness)
         return;
@@ -12071,11 +12071,9 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
         if (HasSpell(proto->Spells[1].SpellId))
             return EQUIP_ERR_NONE;
 
-#ifdef ELUNA
     InventoryResult eres = sEluna->OnCanUseItem(this, proto->ItemId);
     if (eres != EQUIP_ERR_OK)
         return eres;
-#endif
 
     return EQUIP_ERR_OK;
 }
@@ -12506,9 +12504,7 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
-#ifdef ELUNA
         sEluna->OnEquip(this, pItem2, bag, slot);
-#endif
         return pItem2;
     }
 
@@ -12516,9 +12512,7 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
 
-#ifdef ELUNA
         sEluna->OnEquip(this, pItem, bag, slot);
-#endif
     return pItem;
 }
 
@@ -12541,9 +12535,7 @@ void Player::QuickEquipItem(uint16 pos, Item* pItem)
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
 
-#ifdef ELUNA
         sEluna->OnEquip(this, pItem, (pos >> 8), slot);
-#endif
     }
 }
 
@@ -14546,12 +14538,12 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
             if (optionBroadcastText)
                 strOptionText = optionBroadcastText->GetText(locale, getGender());
             else
-                strOptionText = itr->second.OptionText;
+                strOptionText = "<error>";
 
             if (boxBroadcastText)
                 strBoxText = boxBroadcastText->GetText(locale, getGender());
             else
-                strBoxText = itr->second.BoxText;
+                strBoxText = "<error>";
 
             if (locale != DEFAULT_LOCALE)
             {
@@ -14945,25 +14937,11 @@ void Player::SendPreparedQuest(ObjectGuid guid)
             }
             else
             {
-                qe = gossiptext->Options[0].Emotes[0];
-
-                if (!gossiptext->Options[0].Text_0.empty())
+                BroadcastText const* broadcastText = sObjectMgr->GetBroadcastText(gossiptext->Options[0].BroadcastTextID);
+                if (broadcastText)
                 {
-                    title = gossiptext->Options[0].Text_0;
-
-                    int loc_idx = GetSession()->GetSessionDbLocaleIndex();
-                    if (loc_idx >= 0)
-                        if (NpcTextLocale const* nl = sObjectMgr->GetNpcTextLocale(textid))
-                            ObjectMgr::GetLocaleString(nl->Text_0[0], loc_idx, title);
-                }
-                else
-                {
-                    title = gossiptext->Options[0].Text_1;
-
-                    int loc_idx = GetSession()->GetSessionDbLocaleIndex();
-                    if (loc_idx >= 0)
-                        if (NpcTextLocale const* nl = sObjectMgr->GetNpcTextLocale(textid))
-                            ObjectMgr::GetLocaleString(nl->Text_1[0], loc_idx, title);
+                    qe._Emote = broadcastText->EmoteId0;
+                    title = broadcastText->GetText();
                 }
             }
         }
@@ -25157,9 +25135,7 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         if (loot->containerID > 0)
             loot->DeleteLootItemFromContainerItemDB(item->itemid);
 
-#ifdef ELUNA
         sEluna->OnLootItem(this, newitem, item->count, this->GetLootGUID());
-#endif
     }
     else
         SendEquipError(msg, NULL, NULL, item->itemid);
@@ -25597,9 +25573,7 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
     // update free talent points
     SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
 
-#ifdef ELUNA
     sEluna->OnLearnTalents(this, talentId, talentRank, spellid);
-#endif
 }
 
 void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank)

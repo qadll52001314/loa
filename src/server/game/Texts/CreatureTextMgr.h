@@ -39,13 +39,10 @@ struct CreatureTextEntry
     uint32 entry;
     uint8 group;
     uint8 id;
-    std::string text;
     ChatMsg type;
     Language lang;
     float probability;
-    Emote emote;
     uint32 duration;
-    uint32 sound;
     uint32 BroadcastTextId;
     CreatureTextRange TextRange;
 };

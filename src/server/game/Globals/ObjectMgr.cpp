@@ -5335,14 +5335,14 @@ void ObjectMgr::LoadGossipText()
     uint32 oldMSTime = getMSTime();
 
     QueryResult result = WorldDatabase.Query("SELECT ID, "
-        "text0_0, text0_1, BroadcastTextID0, lang0, prob0, em0_0, em0_1, em0_2, em0_3, em0_4, em0_5, "
-        "text1_0, text1_1, BroadcastTextID1, lang1, prob1, em1_0, em1_1, em1_2, em1_3, em1_4, em1_5, "
-        "text2_0, text2_1, BroadcastTextID2, lang2, prob2, em2_0, em2_1, em2_2, em2_3, em2_4, em2_5, "
-        "text3_0, text3_1, BroadcastTextID3, lang3, prob3, em3_0, em3_1, em3_2, em3_3, em3_4, em3_5, "
-        "text4_0, text4_1, BroadcastTextID4, lang4, prob4, em4_0, em4_1, em4_2, em4_3, em4_4, em4_5, "
-        "text5_0, text5_1, BroadcastTextID5, lang5, prob5, em5_0, em5_1, em5_2, em5_3, em5_4, em5_5, "
-        "text6_0, text6_1, BroadcastTextID6, lang6, prob6, em6_0, em6_1, em6_2, em6_3, em6_4, em6_5, "
-        "text7_0, text7_1, BroadcastTextID7, lang7, prob7, em7_0, em7_1, em7_2, em7_3, em7_4, em7_5 "
+        "BroadcastTextID0, prob0, "
+        "BroadcastTextID1, prob1, "
+        "BroadcastTextID2, prob2, "
+        "BroadcastTextID3, prob3, "
+        "BroadcastTextID4, prob4, "
+        "BroadcastTextID5, prob5, "
+        "BroadcastTextID6, prob6, "
+        "BroadcastTextID7, prob7 "
         "FROM npc_text");
 
 
@@ -5375,17 +5375,8 @@ void ObjectMgr::LoadGossipText()
 
         for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
         {
-            gText.Options[i].Text_0           = fields[cic++].GetString();
-            gText.Options[i].Text_1           = fields[cic++].GetString();
             gText.Options[i].BroadcastTextID  = fields[cic++].GetUInt32();
-            gText.Options[i].Language         = fields[cic++].GetUInt8();
             gText.Options[i].Probability      = fields[cic++].GetFloat();
-
-            for (uint8 j = 0; j < MAX_GOSSIP_TEXT_EMOTES; ++j)
-            {
-                gText.Options[i].Emotes[j]._Delay = fields[cic++].GetUInt16();
-                gText.Options[i].Emotes[j]._Emote = fields[cic++].GetUInt16();
-            }
         }
 
         for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; i++)
@@ -5408,6 +5399,7 @@ void ObjectMgr::LoadGossipText()
 
 void ObjectMgr::LoadNpcTextLocales()
 {
+    /*
     uint32 oldMSTime = getMSTime();
 
     _npcTextLocaleStore.clear();                              // need for reload case
@@ -5446,6 +5438,7 @@ void ObjectMgr::LoadNpcTextLocales()
     } while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u NpcText locale strings in %u ms", uint32(_npcTextLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
+    */
 }
 
 //not very fast function but it is called only once a day, or on starting-up
@@ -8082,7 +8075,7 @@ void ObjectMgr::LoadMailLevelRewards()
     TC_LOG_INFO("server.loading", ">> Loaded %u level dependent mail rewards in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
-void ObjectMgr::AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, uint32 reqSkill, uint32 reqSkillValue, uint32 reqLevel)
+void ObjectMgr::AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, uint32 reqSkill, uint32 reqSkillValue, uint32 reqLevel, uint32 reqCityRank)
 {
     if (entry >= TRINITY_TRAINER_START_REF)
         return;
@@ -8127,6 +8120,7 @@ void ObjectMgr::AddSpellToTrainer(uint32 entry, uint32 spell, uint32 spellCost, 
     trainerSpell.reqSkill      = reqSkill;
     trainerSpell.reqSkillValue = reqSkillValue;
     trainerSpell.reqLevel      = reqLevel;
+    trainerSpell.reqCityRank   = reqCityRank;
 
     if (!trainerSpell.reqLevel)
         trainerSpell.reqLevel = spellinfo->SpellLevel;
@@ -8167,7 +8161,7 @@ void ObjectMgr::LoadTrainerSpell()
     // For reload case
     _cacheTrainerSpellStore.clear();
 
-    QueryResult result = WorldDatabase.Query("SELECT b.entry, a.spell, a.spellcost, a.reqskill, a.reqskillvalue, a.reqlevel FROM npc_trainer AS a "
+    QueryResult result = WorldDatabase.Query("SELECT b.entry, a.spell, a.spellcost, a.reqskill, a.reqskillvalue, a.reqlevel, a.reqcityrank FROM npc_trainer AS a "
                                              "INNER JOIN npc_trainer AS b ON a.entry = -(b.spell) "
                                              "UNION SELECT * FROM npc_trainer WHERE spell > 0");
 
@@ -8190,8 +8184,9 @@ void ObjectMgr::LoadTrainerSpell()
         uint32 reqSkill      = fields[3].GetUInt16();
         uint32 reqSkillValue = fields[4].GetUInt16();
         uint32 reqLevel      = fields[5].GetUInt8();
+        uint32 reqCityRank = fields[6].GetUInt32();
 
-        AddSpellToTrainer(entry, spell, spellCost, reqSkill, reqSkillValue, reqLevel);
+        AddSpellToTrainer(entry, spell, spellCost, reqSkill, reqSkillValue, reqLevel, reqCityRank);
 
         ++count;
     }
@@ -8337,8 +8332,8 @@ void ObjectMgr::LoadGossipMenuItems()
     _gossipMenuItemsStore.clear();
 
     QueryResult result = WorldDatabase.Query(
-        //      0        1   2            3            4                      5          6                   7               8              9          10         11        12
-        "SELECT menu_id, id, option_icon, option_text, OptionBroadcastTextID, option_id, npc_option_npcflag, action_menu_id, action_poi_id, box_coded, box_money, box_text, BoxBroadcastTextID, SingleTimeCheck "
+        //      0        1   2            3                      4          5                   6               7              8          9          10                  11
+        "SELECT menu_id, id, option_icon, OptionBroadcastTextID, option_id, npc_option_npcflag, action_menu_id, action_poi_id, box_coded, box_money, BoxBroadcastTextID, SingleTimeCheck "
         "FROM gossip_menu_option ORDER BY menu_id, id");
 
     if (!result)
@@ -8358,17 +8353,15 @@ void ObjectMgr::LoadGossipMenuItems()
         gMenuItem.MenuId                = fields[0].GetUInt16();
         gMenuItem.OptionIndex           = fields[1].GetUInt16();
         gMenuItem.OptionIcon            = fields[2].GetUInt32();
-        gMenuItem.OptionText            = fields[3].GetString();
-        gMenuItem.OptionBroadcastTextId = fields[4].GetUInt32();
-        gMenuItem.OptionType            = fields[5].GetUInt8();
-        gMenuItem.OptionNpcflag         = fields[6].GetUInt32();
-        gMenuItem.ActionMenuId          = fields[7].GetUInt32();
-        gMenuItem.ActionPoiId           = fields[8].GetUInt32();
-        gMenuItem.BoxCoded              = fields[9].GetBool();
-        gMenuItem.BoxMoney              = fields[10].GetUInt32();
-        gMenuItem.BoxText               = fields[11].GetString();
-        gMenuItem.BoxBroadcastTextId    = fields[12].GetUInt32();
-        gMenuItem.SingleTimeCheck       = fields[13].GetBool();
+        gMenuItem.OptionBroadcastTextId = fields[3].GetUInt32();
+        gMenuItem.OptionType            = fields[4].GetUInt8();
+        gMenuItem.OptionNpcflag         = fields[5].GetUInt32();
+        gMenuItem.ActionMenuId          = fields[6].GetUInt32();
+        gMenuItem.ActionPoiId           = fields[7].GetUInt32();
+        gMenuItem.BoxCoded              = fields[8].GetBool();
+        gMenuItem.BoxMoney              = fields[9].GetUInt32();
+        gMenuItem.BoxBroadcastTextId    = fields[10].GetUInt32();
+        gMenuItem.SingleTimeCheck       = fields[11].GetBool();
 
         if (gMenuItem.OptionIcon >= GOSSIP_ICON_MAX)
         {

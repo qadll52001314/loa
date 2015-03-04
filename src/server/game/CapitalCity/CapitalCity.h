@@ -1,6 +1,10 @@
 #ifndef CAPITAL_CITY_H_
 #define CAPITAL_CITY_H_
 
+#include "Common.h"
+#include "SharedDefines.h"
+#include "Player.h"
+
 #define RESOURCE_GATHER_DIFF                900000 // 15min
 #define WORLDSTATE_IN_CAPITAL_CITY          6005
 #define WORLDSTATE_CAPITAL_CITY_LEVEL       6003
