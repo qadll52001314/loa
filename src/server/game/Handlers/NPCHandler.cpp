@@ -37,6 +37,7 @@
 #include "ScriptMgr.h"
 #include "CreatureAI.h"
 #include "SpellInfo.h"
+#include "CapitalCityMgr.h"
 
 enum StableResultCode
 {
@@ -155,13 +156,19 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
     data << uint32(trainer_spells->spellList.size());
 
     // reputation discount
-    float fDiscountMod = _player->GetReputationPriceDiscount(unit);
+    float fDiscountMod = _player->GetPriceDiscount(unit);
     bool can_learn_primary_prof = GetPlayer()->GetFreePrimaryProfessionPoints() > 0;
 
     uint32 count = 0;
     for (TrainerSpellMap::const_iterator itr = trainer_spells->spellList.begin(); itr != trainer_spells->spellList.end(); ++itr)
     {
         TrainerSpell const* tSpell = &itr->second;
+
+        if (tSpell->reqCityRank != 0)
+        {
+            if (!xCapitalCityMgr->ReachedRequiredRank(unit, tSpell->reqCityRank) && !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM))
+                continue;
+        }
 
         bool valid = true;
         bool primary_prof_first_rank = false;
@@ -264,7 +271,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recvData)
         return;
 
     // apply reputation discount
-    uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetReputationPriceDiscount(unit)));
+    uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetPriceDiscount(unit)));
 
     // check money requirement
     if (!_player->HasEnoughMoney(nSpellCost))
@@ -871,7 +878,7 @@ void WorldSession::HandleRepairItemOpcode(WorldPacket& recvData)
         GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
     // reputation discount
-    float discountMod = _player->GetReputationPriceDiscount(unit);
+    float discountMod = _player->GetPriceDiscount(unit);
 
     if (itemGUID)
     {

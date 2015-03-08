@@ -31,5 +31,7 @@ void AddPetScripts();
 void AddBattlegroundScripts();
 void AddOutdoorPvPScripts();
 void AddCustomScripts();
+void AddCapitalCityScripts();
+void AddResourcePointScripts();
 
 #endif

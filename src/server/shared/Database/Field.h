@@ -251,11 +251,6 @@ class Field
             return data.value == NULL;
         }
 
-        enum_field_types GetType() const
-        {
-            return data.type;
-        }
-
     protected:
         Field();
         ~Field();

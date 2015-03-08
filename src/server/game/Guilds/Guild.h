@@ -662,8 +662,6 @@ public:
     time_t GetCreatedDate() const { return m_createdDate; }
     uint64 GetBankMoney() const { return m_bankMoney; }
 
-    uint32 GetMemberSize() const { return m_members.size(); }
-
     bool SetName(std::string const& name);
 
     // Handle client commands

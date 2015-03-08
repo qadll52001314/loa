@@ -46,7 +46,6 @@
 #include "Transport.h"
 #include "WardenWin.h"
 #include "WardenMac.h"
-#include "LuaEngine.h"
 #include "MoveSpline.h"
 
 namespace {
@@ -230,9 +229,6 @@ void WorldSession::SendPacket(WorldPacket* packet)
 
     sScriptMgr->OnPacketSend(this, *packet);
 
-    if (!sEluna->OnPacketSend(this, *packet))
-        return;
-
     m_Socket->SendPacket(*packet);
 }
 
@@ -323,8 +319,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         else if (_player->IsInWorld() && AntiDOS.EvaluateOpcode(*packet, currentTime))
                         {
                             sScriptMgr->OnPacketReceive(this, *packet);
-                            if (!sEluna->OnPacketReceive(this, *packet))
-                                break;
                             (this->*opHandle.handler)(*packet);
                             LogUnprocessedTail(packet);
                         }
@@ -338,8 +332,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         {
                             // not expected _player or must checked in packet handler
                             sScriptMgr->OnPacketReceive(this, *packet);
-                            if (!sEluna->OnPacketReceive(this, *packet))
-                                break;
                             (this->*opHandle.handler)(*packet);
                             LogUnprocessedTail(packet);
                         }
@@ -352,8 +344,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         else if(AntiDOS.EvaluateOpcode(*packet, currentTime))
                         {
                             sScriptMgr->OnPacketReceive(this, *packet);
-                            if (!sEluna->OnPacketReceive(this, *packet))
-                                break;
                             (this->*opHandle.handler)(*packet);
                             LogUnprocessedTail(packet);
                         }
@@ -374,8 +364,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         if (AntiDOS.EvaluateOpcode(*packet, currentTime))
                         {
                             sScriptMgr->OnPacketReceive(this, *packet);
-                            if (!sEluna->OnPacketReceive(this, *packet))
-                                break;
                             (this->*opHandle.handler)(*packet);
                             LogUnprocessedTail(packet);
                         }

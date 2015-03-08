@@ -51,7 +51,6 @@
 #include "WaypointMovementGenerator.h"
 #include "World.h"
 #include "WorldPacket.h"
-#include "LuaEngine.h"
 
 #include "Transport.h"
 
@@ -183,7 +182,6 @@ void Creature::AddToWorld()
     ///- Register the creature for guid lookup
     if (!IsInWorld())
     {
-        sEluna->OnAddToWorld(this);
         if (GetZoneScript())
             GetZoneScript()->OnCreatureCreate(this);
         sObjectAccessor->AddObject(this);
@@ -199,7 +197,6 @@ void Creature::RemoveFromWorld()
 {
     if (IsInWorld())
     {
-        sEluna->OnRemoveFromWorld(this);
         if (GetZoneScript())
             GetZoneScript()->OnCreatureRemove(this);
         if (m_formation)

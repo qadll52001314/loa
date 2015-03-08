@@ -99,15 +99,15 @@ void GossipMenu::AddMenuItem(uint32 menuId, uint32 menuItemId, uint32 sender, ui
         if (optionBroadcastText)
             strOptionText = optionBroadcastText->GetText(GetLocale());
         else
-            strOptionText = "<error>";
+            strOptionText = "<invalid broadcast text>";
 
         /// BoxText
         if (boxBroadcastText)
             strBoxText = boxBroadcastText->GetText(GetLocale());
-        else
-            strBoxText = "<error>";
+        // no else condition
 
         /// Check need of localization.
+        /*
         if (GetLocale() != DEFAULT_LOCALE)
         {
             if (!optionBroadcastText)
@@ -124,6 +124,7 @@ void GossipMenu::AddMenuItem(uint32 menuId, uint32 menuItemId, uint32 sender, ui
                     ObjectMgr::GetLocaleString(gossipMenuLocale->BoxText, GetLocale(), strBoxText);
             }
         }
+        */
 
         /// Add menu item with existing method. Menu item id -1 is also used in ADD_GOSSIP_ITEM macro.
         AddMenuItem(-1, itr->second.OptionIcon, strOptionText, sender, action, strBoxText, itr->second.BoxMoney, itr->second.BoxCoded, itr->second.SingleTimeCheck);

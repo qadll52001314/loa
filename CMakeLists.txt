@@ -48,7 +48,7 @@ if( NOPCH )
   set(USE_SCRIPTPCH 0)
 endif()
 
-include(CheckPlatform)	
+include(CheckPlatform)
 
 # basic packagesearching and setup (further support will be needed, this is a preliminary release!)
 set(OPENSSL_EXPECTED_VERSION 1.0.0)

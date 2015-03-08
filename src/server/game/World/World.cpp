@@ -66,8 +66,6 @@
 #include "WorldSession.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
-#include "LuaEngine.h"
-
 
 std::atomic<bool> World::m_stopEvent(false);
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -1352,10 +1350,6 @@ void World::SetInitialWorldSettings()
         exit(1);
     }
 
-    ///- Initialize Lua Engine
-    TC_LOG_INFO("server.loading", "Initialize Eluna Lua Engine...");
-    Eluna::Initialize();
-
     ///- Initialize pool manager
     sPoolMgr->Initialize();
 
@@ -1775,12 +1769,6 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Loading Calendar data...");
     sCalendarMgr->LoadFromDB();
 
-    TC_LOG_INFO("server.loading", "Loading Capital City defines...");
-    xCapitalCityMgr->LoadCapitalCities();
-
-    TC_LOG_INFO("server.loading", "Loading Resource Point defines...");
-    xResourcePointMgr->LoadResourcePoints();
-
     ///- Initialize game time and timers
     TC_LOG_INFO("server.loading", "Initialize game time and timers");
     m_gameTime = time(NULL);
@@ -1850,9 +1838,15 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Starting Outdoor PvP System");
     sOutdoorPvPMgr->InitOutdoorPvP();
 
+    TC_LOG_INFO("server.loading", "Loading Capital City defines...");
+    xCapitalCityMgr->LoadCapitalCities();
+
+    TC_LOG_INFO("server.loading", "Loading Resource Point defines...");
+    xResourcePointMgr->LoadResourcePoints();
+
     ///- Initialize Battlefield
-    TC_LOG_INFO("server.loading", "Starting Battlefield System");
-    sBattlefieldMgr->InitBattlefield();
+    //TC_LOG_INFO("server.loading", "Starting Battlefield System");
+    //sBattlefieldMgr->InitBattlefield();
 
     TC_LOG_INFO("server.loading", "Loading Transports...");
     sTransportMgr->SpawnContinentTransports();
@@ -1883,11 +1877,6 @@ void World::SetInitialWorldSettings()
     InitGuildResetTime();
 
     LoadCharacterNameData();
-
-    ///- Run eluna scripts.
-    // in multithread foreach: run scripts
-    sEluna->RunScripts();
-    sEluna->OnConfigLoad(false); // Must be done after Eluna is initialized and scripts have run.
 
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 

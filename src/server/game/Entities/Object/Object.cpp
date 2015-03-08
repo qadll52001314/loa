@@ -51,8 +51,6 @@
 #include "BattlefieldMgr.h"
 #include "Battleground.h"
 #include "Chat.h"
-#include "LuaEngine.h"
-#include "ElunaEventMgr.h"
 
 Object::Object() : m_PackGUID(sizeof(uint64)+1)
 {
@@ -70,9 +68,6 @@ Object::Object() : m_PackGUID(sizeof(uint64)+1)
 
 WorldObject::~WorldObject()
 {
-    delete elunaEvents;
-    elunaEvents = NULL;
-
     // this may happen because there are many !create/delete
     if (IsWorldObject() && m_currMap)
     {
@@ -1106,7 +1101,6 @@ void MovementInfo::OutDebug()
 }
 
 WorldObject::WorldObject(bool isWorldObject) : WorldLocation(), LastUsedScriptID(0),
-elunaEvents(NULL),
 m_name(""), m_isActive(false), m_isWorldObject(isWorldObject), m_zoneScript(NULL),
 m_transport(NULL), m_currMap(NULL), m_InstanceId(0),
 m_phaseMask(PHASEMASK_NORMAL), m_notifyflags(0), m_executed_notifies(0)
@@ -1174,11 +1168,6 @@ void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/)
 
     if (Transport* transport = GetTransport())
         transport->RemovePassenger(this);
-}
-
-void WorldObject::Update(uint32 time_diff)
-{
-    elunaEvents->Update(time_diff);
 }
 
 void WorldObject::_Create(uint32 guidlow, HighGuid guidhigh, uint32 phaseMask)
@@ -1954,11 +1943,6 @@ void WorldObject::SetMap(Map* map)
     m_currMap = map;
     m_mapId = map->GetId();
     m_InstanceId = map->GetInstanceId();
-
-    delete elunaEvents;
-    // On multithread replace this with a pointer to map's Eluna pointer stored in a map
-    elunaEvents = new ElunaEventProcessor(&Eluna::GEluna, this);
-
     if (IsWorldObject())
         m_currMap->AddWorldObject(this);
 }
@@ -1969,10 +1953,6 @@ void WorldObject::ResetMap()
     ASSERT(!IsInWorld());
     if (IsWorldObject())
         m_currMap->RemoveWorldObject(this);
-
-    delete elunaEvents;
-    elunaEvents = NULL;
-
     m_currMap = NULL;
     //maybe not for corpse
     //m_mapId = 0;

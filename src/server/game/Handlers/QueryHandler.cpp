@@ -300,33 +300,44 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recvData)
             {
                 text0[i] = bct->GetText(locale, GENDER_MALE, true);
                 text1[i] = bct->GetText(locale, GENDER_FEMALE, true);
+
+                data << gossip->Options[i].Probability;
+
+                if (text0[i].empty())
+                    data << text1[i];
+                else
+                    data << text0[i];
+
+                if (text1[i].empty())
+                    data << text0[i];
+                else
+                    data << text1[i];
+
+                data << bct->Language;
+
+                data << bct->EmoteDelay0;
+                data << bct->EmoteId0;
+                data << bct->EmoteDelay1;
+                data << bct->EmoteId1;
+                data << bct->EmoteDelay2;
+                data << bct->EmoteId2;
             }
-            else
+            else // don't send empty data
             {
-                text0[i] = "";
-                text1[i] = "";
+                data << uint32(0);
+
+                data << "";
+                data << "";
+
+                data << uint32(0);
+
+                data << uint32(0);
+                data << uint32(0);
+                data << uint32(0);
+                data << uint32(0);
+                data << uint32(0);
+                data << uint32(0);
             }
-
-            data << gossip->Options[i].Probability;
-
-            if (text0[i].empty())
-                data << text1[i];
-            else
-                data << text0[i];
-
-            if (text1[i].empty())
-                data << text0[i];
-            else
-                data << text1[i];
-
-            data << bct->Language;
-
-            data << bct->EmoteDelay0;
-            data << bct->EmoteId0;
-            data << bct->EmoteDelay1;
-            data << bct->EmoteId1;
-            data << bct->EmoteDelay2;
-            data << bct->EmoteId2;
         }
     }
 

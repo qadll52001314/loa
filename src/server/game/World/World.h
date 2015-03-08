@@ -852,8 +852,12 @@ class World
         Queue m_QueuedPlayer;
 
         // sessions that are added async
-        void AddSession_(WorldSession* s);
+#ifdef _DEBUG
+        LockedQueue<WorldSession*> fakeSessQueue;
+#endif // _DEBUG
+        
         LockedQueue<WorldSession*> addSessQueue;
+        void AddSession_(WorldSession* s);
 
         // used versions
         std::string m_DBVersion;

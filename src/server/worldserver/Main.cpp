@@ -47,9 +47,6 @@
 #include "SystemConfig.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
-#include "CapitalCityMgr.h"
-#include "ResourcePointMgr.h"
-#include "LuaEngine.h"
 
 using namespace boost::program_options;
 
@@ -170,7 +167,7 @@ int mainImpl(int argc, char** argv)
     signals.async_wait(SignalHandler);
 
     // Start the Boost based thread pool
-    int numThreads = sConfigMgr->GetIntDefault("ThreadPool", 2);
+    int numThreads = sConfigMgr->GetIntDefault("ThreadPool", 1);
     std::vector<std::thread> threadPool;
 
     if (numThreads < 1)
@@ -260,10 +257,6 @@ int mainImpl(int argc, char** argv)
     sObjectAccessor->UnloadAll();             // unload 'i_player2corpse' storage and remove from world
     sScriptMgr->Unload();
     sOutdoorPvPMgr->Die();
-    xCapitalCityMgr->Save();
-    xResourcePointMgr->Save();
-
-    Eluna::Uninitialize();
 
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realmID);

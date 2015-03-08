@@ -33,7 +33,6 @@
 #include "UpdateFieldFlags.h"
 #include "World.h"
 #include "Transport.h"
-#include "LuaEngine.h"
 #include <G3D/Quat.h>
 
 GameObject::GameObject() : WorldObject(false), MapObject(),
@@ -126,7 +125,6 @@ void GameObject::AddToWorld()
     ///- Register the gameobject for guid lookup
     if (!IsInWorld())
     {
-        sEluna->OnAddToWorld(this);
         if (m_zoneScript)
             m_zoneScript->OnGameObjectCreate(this);
 
@@ -152,7 +150,6 @@ void GameObject::RemoveFromWorld()
     ///- Remove the gameobject from the accessor
     if (IsInWorld())
     {
-        sEluna->OnRemoveFromWorld(this);
         if (m_zoneScript)
             m_zoneScript->OnGameObjectRemove(this);
 

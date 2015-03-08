@@ -1333,7 +1333,8 @@ class Player : public Unit, public GridObject<Player>
         bool BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uint32 item, uint8 count, uint8 bag, uint8 slot);
         bool _StoreOrEquipNewItem(uint32 vendorslot, uint32 item, uint8 count, uint8 bag, uint8 slot, int32 price, ItemTemplate const* pProto, Creature* pVendor, VendorItem const* crItem, bool bStore);
 
-        float GetReputationPriceDiscount(Creature const* creature) const;
+        float GetPriceDiscount(Creature const* creature) const;
+        bool InSameFaction(uint32 faction) const;
 
         Player* GetTrader() const { return m_trade ? m_trade->GetTrader() : NULL; }
         TradeData* GetTradeData() const { return m_trade; }

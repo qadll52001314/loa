@@ -46,7 +46,6 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
-#include "LuaEngine.h"
 
 
 class LoginQueryHolder : public SQLQueryHolder

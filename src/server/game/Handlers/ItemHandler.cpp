@@ -768,7 +768,7 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
     size_t countPos = data.wpos();
     data << uint8(count);
 
-    float discountMod = _player->GetReputationPriceDiscount(vendor);
+    float discountMod = _player->GetPriceDiscount(vendor);
 
     for (uint8 slot = 0; slot < itemCount; ++slot)
     {

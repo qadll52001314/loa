@@ -142,13 +142,13 @@ enum DeclinedNameResult
     DECLINED_NAMES_RESULT_ERROR   = 1
 };
 
-struct LegacyItem
-{
-    uint32 entry;
-    bool available;
-};
-
-typedef std::vector<LegacyItem> LegacyItemList;
+//struct LegacyItem
+//{
+//    uint32 entry;
+//    bool available;
+//};
+//
+//typedef std::vector<LegacyItem> LegacyItemList;
 
 //class to deal with packet processing
 //allows to determine if next packet is safe to be processed
@@ -260,8 +260,8 @@ class WorldSession
         WorldSession(uint32 id, std::shared_ptr<WorldSocket> sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale, uint32 recruiter, bool isARecruiter);
         ~WorldSession();
 
-        LegacyItemList* GetLegacyItemList() { return &m_legacyItems; }
-        void LoadLegacyItems();
+        //LegacyItemList* GetLegacyItemList() { return &m_legacyItems; }
+        //void LoadLegacyItems();
 
         bool PlayerLoading() const { return m_playerLoading; }
         bool PlayerLogout() const { return m_playerLogout; }
@@ -986,7 +986,7 @@ class WorldSession
         QueryCallback<PreparedQueryResult, CharacterCreateInfo*, true> _charCreateCallback;
         QueryResultHolderFuture _charLoginCallback;
 
-        LegacyItemList m_legacyItems;
+        //LegacyItemList m_legacyItems;
 
     friend class World;
     protected:

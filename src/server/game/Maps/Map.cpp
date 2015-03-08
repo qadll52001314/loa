@@ -36,7 +36,6 @@
 #include "Transport.h"
 #include "Vehicle.h"
 #include "VMapFactory.h"
-#include "LuaEngine.h"
 
 u_map_magic MapMagic        = { {'M','A','P','S'} };
 u_map_magic MapVersionMagic = { {'v','1','.','3'} };
@@ -2584,11 +2583,6 @@ void Map::DelayedUpdate(const uint32 t_diff)
 void Map::AddObjectToRemoveList(WorldObject* obj)
 {
     ASSERT(obj->GetMapId() == GetId() && obj->GetInstanceId() == GetInstanceId());
-
-    if (Creature* creature = obj->ToCreature())
-        sEluna->OnRemove(creature);
-    else if (GameObject* gameobject = obj->ToGameObject())
-        sEluna->OnRemove(gameobject);
 
     obj->CleanupsBeforeDelete(false);                            // remove or simplify at least cross referenced links
 

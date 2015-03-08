@@ -687,6 +687,19 @@ void AddSC_outdoorpvp_zm();
 void AddSC_chat_log();
 void AddSC_action_ip_logger();
 
+// capital city
+void AddSC_cc_darnassus();
+void AddSC_cc_exodar();
+void AddSC_cc_ironforge();
+void AddSC_cc_orgrimmar();
+void AddSC_cc_silvermoon();
+void AddSC_cc_stormwind();
+void AddSC_cc_thunderbluff();
+void AddSC_cc_undercity();
+
+// resource point
+void AddSC_rp_lushwater_oasis();
+
 #endif
 
 void AddScripts()
@@ -704,6 +717,8 @@ void AddScripts()
     AddPetScripts();
     AddBattlegroundScripts();
     AddOutdoorPvPScripts();
+    AddCapitalCityScripts();
+    AddResourcePointScripts();
     AddCustomScripts();
 #endif
 }
@@ -1403,6 +1418,27 @@ void AddOutdoorPvPScripts()
     AddSC_outdoorpvp_tf();
     AddSC_outdoorpvp_zm();
 #endif
+}
+
+void AddCapitalCityScripts()
+{
+#ifdef SCRIPTS
+    AddSC_cc_darnassus();
+    AddSC_cc_exodar();
+    AddSC_cc_ironforge();
+    AddSC_cc_orgrimmar();
+    AddSC_cc_silvermoon();
+    AddSC_cc_stormwind();
+    AddSC_cc_thunderbluff();
+    AddSC_cc_undercity();
+#endif // SCRIPTS
+}
+
+void AddResourcePointScripts()
+{
+#ifdef SCRIPTS
+    AddSC_rp_lushwater_oasis();
+#endif // SCRIPTS
 }
 
 void AddBattlegroundScripts()

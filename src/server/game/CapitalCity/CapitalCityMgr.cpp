@@ -77,13 +77,13 @@ void CapitalCityMgr::ClearStateOf(Player* player, uint32 index)
 
 void CapitalCityMgr::HandlePlayerEnter(Player* player, uint32 zone)
 {
-    if (CapitalCity* city = m_CapitalCities[zone])
+    if (CapitalCity* city = GetCapitalCity(zone))
         city->HandlePlayerEnter(player);
 }
 
 void CapitalCityMgr::HandlePlayerLeave(Player* player, uint32 zone)
 {
-    if (CapitalCity* city = m_CapitalCities[zone])
+    if (CapitalCity* city = GetCapitalCity(zone))
         city->HandlePlayerLeave(player);
 }
 

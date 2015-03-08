@@ -53,15 +53,6 @@ source_group("DataStores" FILES ${sources_DataStores})
 message(" - Dungeon Finding")
 file(GLOB_RECURSE sources_DungeonFinding DungeonFinding/*.cpp DungeonFinding/*.h)
 source_group("DungeonFinding" FILES ${sources_DungeonFinding})
-message(" - Eluna Methods")
-file(GLOB_RECURSE sources_ElunaMethods Eluna/*Methods.h)
-source_group("Eluna\\Methods" FILES ${sources_ElunaMethods})
-message(" - Eluna Hooks")
-file(GLOB_RECURSE sources_ElunaHooks Eluna/*Hooks.cpp)
-source_group("Eluna\\Hooks" FILES ${sources_ElunaHooks})
-message(" - Eluna Core")
-file(GLOB sources_ElunaCore Eluna/*.cpp Eluna/*.h)
-source_group("Eluna\\Core" FILES ${sources_ElunaCore})
 message(" - Entities")
 file(GLOB_RECURSE sources_Entities Entities/*.cpp Entities/*.h)
 source_group("Entities" FILES ${sources_Entities})
@@ -117,8 +108,8 @@ message(" - Scripting")
 file(GLOB_RECURSE sources_Scripting Scripting/*.cpp Scripting/*.h)
 source_group("Scripting" FILES ${sources_Scripting})
 message(" - Resource Point")
-source_group("ResourcePoint" FILES ${sources_ResourcePoint})
 file(GLOB_RECURSE sources_ResourcePoint ResourcePoint/*.cpp ResourcePoint/*.h)
+source_group("ResourcePoint" FILES ${sources_ResourcePoint})
 message(" - Server")
 file(GLOB_RECURSE sources_Server Server/*.cpp Server/*.h)
 source_group("Server" FILES ${sources_Server})
@@ -180,9 +171,6 @@ set(game_STAT_SRCS
   ${sources_Conditions}
   ${sources_DataStores}
   ${sources_DungeonFinding}
-  ${sources_ElunaCore}
-  ${sources_ElunaHooks}
-  ${sources_ElunaMethods}
   ${sources_Entities}
   ${sources_Events}
   ${sources_Globals}
@@ -225,7 +213,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/dep/g3dlite/include
   ${CMAKE_SOURCE_DIR}/dep/SFMT
   ${CMAKE_SOURCE_DIR}/dep/zlib
-  ${CMAKE_SOURCE_DIR}/dep/lua
   ${CMAKE_SOURCE_DIR}/src/server/collision
   ${CMAKE_SOURCE_DIR}/src/server/collision/Management
   ${CMAKE_SOURCE_DIR}/src/server/collision/Models
@@ -266,7 +253,6 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Conditions
   ${CMAKE_CURRENT_SOURCE_DIR}/DataStores
   ${CMAKE_CURRENT_SOURCE_DIR}/DungeonFinding
-  ${CMAKE_CURRENT_SOURCE_DIR}/Eluna
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Creature
   ${CMAKE_CURRENT_SOURCE_DIR}/Entities/Corpse

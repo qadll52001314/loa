@@ -28,12 +28,14 @@ set(scripts_STAT_SRCS
 
 if(SCRIPTS)
   message("Game Scripts")
+  include(CapitalCity/CMakeLists.txt)
   include(Zone/CMakeLists.txt)
   include(Dungeon/CMakeLists.txt)
   include(Raid/CMakeLists.txt)
   include(Battleground/CMakeLists.txt)
   include(Event/CMakeLists.txt)
   include(OutdoorPVP/CMakeLists.txt)
+  include(ResourcePoint/CMakeLists.txt)
   include(Pet/CMakeLists.txt)
   include(World/CMakeLists.txt)
   include(Misc/CMakeLists.txt)
@@ -63,7 +65,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/collision
   ${CMAKE_SOURCE_DIR}/src/server/collision/Management
   ${CMAKE_SOURCE_DIR}/src/server/collision/Models
-  ${CMAKE_SOURCE_DIR}/dep/lua
   ${CMAKE_SOURCE_DIR}/src/server/shared
   ${CMAKE_SOURCE_DIR}/src/server/shared/Database
   ${CMAKE_SOURCE_DIR}/src/server/game/Accounts
@@ -88,7 +89,6 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Combat
   ${CMAKE_SOURCE_DIR}/src/server/game/DataStores
   ${CMAKE_SOURCE_DIR}/src/server/game/DungeonFinding
-  ${CMAKE_SOURCE_DIR}/src/server/game/Eluna
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/Corpse
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/Creature
   ${CMAKE_SOURCE_DIR}/src/server/game/Entities/DynamicObject

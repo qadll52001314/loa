@@ -8552,7 +8552,11 @@ void ObjectMgr::LoadScriptNames()
         "UNION "
         "SELECT DISTINCT(ScriptName) FROM outdoorpvp_template WHERE ScriptName <> '' "
         "UNION "
-        "SELECT DISTINCT(script) FROM instance_template WHERE script <> ''");
+        "SELECT DISTINCT(script) FROM instance_template WHERE script <> '' "
+        "UNION "
+        "SELECT DISTINCT(scriptname) FROM capital_cities WHERE scriptname <> '' "
+        "UNION "
+        "SELECT DISTINCT(scriptname) FROM resource_points WHERE scriptname <> ''");
 
     if (!result)
     {

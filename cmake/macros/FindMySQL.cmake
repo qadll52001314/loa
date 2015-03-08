@@ -133,7 +133,7 @@ if( WIN32 )
       "C:/Program Files/MySQL/MySQL Server 5.0/lib/opt"
       "C:/Program Files/MySQL/lib"
 	  "C:/Program Files (x86)/MySQL/MySQL Server 5.7/lib"
-      "C:/Program Files (x86)/MySQL/MySQL Server 5.5/lib"
+      "C:/Program Files (x86)/MySQL/MySQL Server 5.7/lib/opt"
       "C:/Program Files (x86)/MySQL/MySQL Server 5.6/lib"
       "C:/Program Files (x86)/MySQL/MySQL Server 5.6/lib/opt"
       "C:/Program Files (x86)/MySQL/MySQL Server 5.5/lib"

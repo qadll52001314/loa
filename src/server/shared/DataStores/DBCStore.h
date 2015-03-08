@@ -75,7 +75,7 @@ class DBCStorage
     typedef std::list<char*> StringPoolList;
     public:
         explicit DBCStorage(char const* f)
-            : fmt(f), nCount(0), fieldCount(0), dataTable(NULL), maxdatacount(0), mindatacount(std::numeric_limits<uint32>::max())
+            : fmt(f), nCount(0), fieldCount(0), dataTable(NULL)
         {
             indexTable.asT = NULL;
         }
@@ -84,12 +84,6 @@ class DBCStorage
 
         T const* LookupEntry(uint32 id) const
         {
-            if (id <= maxdatacount && id >= mindatacount)
-            {
-                typename std::unordered_map<uint32, T const*>::const_iterator it = data.find(id);
-                if (it != data.end())
-                    return it->second;
-            }
             return (id >= nCount) ? NULL : indexTable.asT[id];
         }
 
@@ -100,16 +94,7 @@ class DBCStorage
             return entry;
         }
 
-        void SetEntry(uint32 id, T* t)
-        {
-            delete data[id];
-            data[id] = t;
-            maxdatacount = std::max(maxdatacount, id);
-            mindatacount = std::min(mindatacount, id);
-        }
-
-        uint32  GetNumRows() const { return std::max(maxdatacount + 1, nCount); }
-
+        uint32  GetNumRows() const { return nCount; }
         char const* GetFormat() const { return fmt; }
         uint32 GetFieldCount() const { return fieldCount; }
 
@@ -286,10 +271,6 @@ class DBCStorage
 
         void Clear()
         {
-            data.clear();
-            maxdatacount = 0;
-            mindatacount = std::numeric_limits<uint32>::max();
-
             if (!indexTable.asT)
                 return;
 
@@ -321,10 +302,6 @@ class DBCStorage
 
         T* dataTable;
         StringPoolList stringPoolList;
-
-        uint32 maxdatacount;
-        uint32 mindatacount;
-        std::unordered_map<uint32, T const*> data;
 
         DBCStorage(DBCStorage const& right) = delete;
         DBCStorage& operator=(DBCStorage const& right) = delete;

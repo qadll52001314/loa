@@ -86,7 +86,6 @@
 #include "WorldSession.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
-#include "LuaEngine.h"
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -5178,8 +5177,6 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
     // update visibility
     UpdateObjectVisibility();
 
-    sEluna->OnResurrect(this);
-
     if (!applySickness)
         return;
 
@@ -7536,8 +7533,8 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
         sOutdoorPvPMgr->HandlePlayerEnterZone(this, newZone);
         sBattlefieldMgr->HandlePlayerLeaveZone(this, m_zoneUpdateId);
         sBattlefieldMgr->HandlePlayerEnterZone(this, newZone);
-        xCapitalCityMgr->HandlePlayerEnter(this, m_zoneUpdateId);
-        xCapitalCityMgr->HandlePlayerLeave(this, newZone);
+        xCapitalCityMgr->HandlePlayerLeave(this, m_zoneUpdateId);
+        xCapitalCityMgr->HandlePlayerEnter(this, newZone);
         SendInitWorldStates(newZone, newArea);              // only if really enters to new zone, not just area change, works strange...
         if (Guild* guild = GetGuild())
             guild->UpdateMemberData(this, GUILD_MEMBER_DATA_ZONEID, newZone);
@@ -12071,10 +12068,6 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
         if (HasSpell(proto->Spells[1].SpellId))
             return EQUIP_ERR_NONE;
 
-    InventoryResult eres = sEluna->OnCanUseItem(this, proto->ItemId);
-    if (eres != EQUIP_ERR_OK)
-        return eres;
-
     return EQUIP_ERR_OK;
 }
 
@@ -12504,7 +12497,6 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
-        sEluna->OnEquip(this, pItem2, bag, slot);
         return pItem2;
     }
 
@@ -12512,7 +12504,6 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
 
-        sEluna->OnEquip(this, pItem, bag, slot);
     return pItem;
 }
 
@@ -12534,8 +12525,6 @@ void Player::QuickEquipItem(uint16 pos, Item* pItem)
 
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, pItem->GetEntry(), slot);
-
-        sEluna->OnEquip(this, pItem, (pos >> 8), slot);
     }
 }
 
@@ -14537,30 +14526,26 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
 
             if (optionBroadcastText)
                 strOptionText = optionBroadcastText->GetText(locale, getGender());
-            else
-                strOptionText = "<error>";
 
             if (boxBroadcastText)
                 strBoxText = boxBroadcastText->GetText(locale, getGender());
-            else
-                strBoxText = "<error>";
 
-            if (locale != DEFAULT_LOCALE)
-            {
-                if (!optionBroadcastText)
-                {
-                    /// Find localizations from database.
-                    if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
-                        ObjectMgr::GetLocaleString(gossipMenuLocale->OptionText, locale, strOptionText);
-                }
+            //if (locale != DEFAULT_LOCALE)
+            //{
+            //    if (!optionBroadcastText)
+            //    {
+            //        /// Find localizations from database.
+            //        if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
+            //            ObjectMgr::GetLocaleString(gossipMenuLocale->OptionText, locale, strOptionText);
+            //    }
 
-                if (!boxBroadcastText)
-                {
-                    /// Find localizations from database.
-                    if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
-                        ObjectMgr::GetLocaleString(gossipMenuLocale->BoxText, locale, strBoxText);
-                }
-            }
+            //    if (!boxBroadcastText)
+            //    {
+            //        /// Find localizations from database.
+            //        if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
+            //            ObjectMgr::GetLocaleString(gossipMenuLocale->BoxText, locale, strBoxText);
+            //    }
+            //}
 
             menu->GetGossipMenu().AddMenuItem(itr->second.OptionIndex, itr->second.OptionIcon, strOptionText, 0, itr->second.OptionType, strBoxText, itr->second.BoxMoney, itr->second.BoxCoded, itr->second.SingleTimeCheck);
             menu->GetGossipMenu().AddGossipMenuItemData(itr->second.OptionIndex, itr->second.ActionMenuId, itr->second.ActionPoiId);
@@ -21495,7 +21480,7 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
     uint32 money = GetMoney();
 
     if (npc)
-        totalcost = (uint32)ceil(totalcost*GetReputationPriceDiscount(npc));
+        totalcost = (uint32)ceil(totalcost*GetPriceDiscount(npc));
 
     if (money < totalcost)
     {
@@ -21917,7 +21902,7 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
         price = pProto->BuyPrice * count; //it should not exceed MAX_MONEY_AMOUNT
 
         // reputation discount
-        price = uint32(floor(price * GetReputationPriceDiscount(creature)));
+        price = uint32(floor(price * GetPriceDiscount(creature)));
 
         if (!HasEnoughMoney(price))
         {
@@ -23723,17 +23708,25 @@ bool Player::GetBGAccessByLevel(BattlegroundTypeId bgTypeId) const
     return true;
 }
 
-float Player::GetReputationPriceDiscount(Creature const* creature) const
+float Player::GetPriceDiscount(Creature const* creature) const
 {
+    float factor = 1.0f;
+
     FactionTemplateEntry const* vendor_faction = creature->GetFactionTemplateEntry();
     if (!vendor_faction || !vendor_faction->faction)
-        return 1.0f;
+        return factor;
 
-    ReputationRank rank = GetReputationRank(vendor_faction->faction);
-    if (rank <= REP_NEUTRAL)
-        return 1.0f;
+    if (InSameFaction(vendor_faction->ID))
+        factor = 0.75f;
 
-    return 1.0f - 0.05f* (rank - REP_NEUTRAL);
+    //ReputationRank rank = GetReputationRank(vendor_faction->faction);
+    //if (rank <= REP_NEUTRAL)
+    //    return factor;
+
+    if (CapitalCity* city = xCapitalCityMgr->FactionBelongsTo(vendor_faction->ID))
+        factor *= (std::pow(0.95f, city->GetLevel()));
+
+    return factor;
 }
 
 bool Player::IsSpellFitByClassAndRace(uint32 spell_id) const
@@ -25134,8 +25127,6 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         // LootItem is being removed (looted) from the container, delete it from the DB.
         if (loot->containerID > 0)
             loot->DeleteLootItemFromContainerItemDB(item->itemid);
-
-        sEluna->OnLootItem(this, newitem, item->count, this->GetLootGUID());
     }
     else
         SendEquipError(msg, NULL, NULL, item->itemid);
@@ -25572,8 +25563,6 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 
     // update free talent points
     SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
-
-    sEluna->OnLearnTalents(this, talentId, talentRank, spellid);
 }
 
 void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank)
@@ -27230,33 +27219,33 @@ void Player::GiveSupremacyLevel()
 void Player::SendLegacyMails()
 {
     // all legacy items are unique and binding to account, so just send mail and unavailable it.
-    LegacyItemList* data = GetSession()->GetLegacyItemList();
-    if (!data || data->size() == 0)
-        return;
+    //LegacyItemList* data = GetSession()->GetLegacyItemList();
+    //if (!data || data->size() == 0)
+    //    return;
 
-    for (LegacyItemList::iterator itr = data->begin(); itr != data->end(); ++itr)
-    {
-        // one letter a item.
-        if (itr->available)
-        {
-            SQLTransaction trans = CharacterDatabase.BeginTransaction();
-            MailDraft draft = MailDraft(292);
-            Item* item = itr->entry ? Item::CreateItem(itr->entry, 1, this) : NULL;
-            if (item)
-            {
-                item->SaveToDB(trans);
-                draft.AddItem(item);
-            }
-            draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43283));
-            CharacterDatabase.CommitTransaction(trans);
-            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(LOGIN_UPD_LEGACY_ITEM);
-            stmt->setBool(0, false);
-            stmt->setUInt32(1, GetSession()->GetAccountId());
-            stmt->setUInt32(2, itr->entry);
-            LoginDatabase.Execute(stmt);
-            itr->available = false;
-        }
-    }
+    //for (LegacyItemList::iterator itr = data->begin(); itr != data->end(); ++itr)
+    //{
+    //    // one letter a item.
+    //    if (itr->available)
+    //    {
+    //        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    //        MailDraft draft = MailDraft(292);
+    //        Item* item = itr->entry ? Item::CreateItem(itr->entry, 1, this) : NULL;
+    //        if (item)
+    //        {
+    //            item->SaveToDB(trans);
+    //            draft.AddItem(item);
+    //        }
+    //        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43283));
+    //        CharacterDatabase.CommitTransaction(trans);
+    //        PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(LOGIN_UPD_LEGACY_ITEM);
+    //        stmt->setBool(0, false);
+    //        stmt->setUInt32(1, GetSession()->GetAccountId());
+    //        stmt->setUInt32(2, itr->entry);
+    //        LoginDatabase.Execute(stmt);
+    //        itr->available = false;
+    //    }
+    //}
 }
 
 void Player::UpdateLegacyItemRecord(int item)
@@ -27307,4 +27296,48 @@ uint32 Player::GetCapitalCityLevel()
     if (city)
         return city->GetLevel();
     return 0;
+}
+
+bool Player::InSameFaction(uint32 faction) const
+{
+    switch (getRace())
+    {
+        case RACE_BLOODELF:
+            if (faction == 1603 || faction == 1604)
+                return true;
+            break;
+        case RACE_DRAENEI:
+            if (faction == 1638 || faction == 1639)
+                return true;
+            break;
+        case RACE_DWARF:
+        case RACE_GNOME:
+            if (faction == 55 || faction == 57)
+                return true;
+            break;
+        case RACE_HUMAN:
+            if (faction == 11 || faction == 12)
+                return true;
+            break;
+        case RACE_NIGHTELF:
+            if (faction == 79 || faction == 80)
+                return true;
+            break;
+        case RACE_ORC:
+        case RACE_TROLL:
+            if (faction == 19 || faction == 126)
+                return true;
+            break;
+        case RACE_TAUREN:
+            if (faction == 104 || faction == 105)
+                return true;
+            break;
+        case RACE_UNDEAD_PLAYER:
+            if (faction == 68 || faction == 71)
+                return true;
+            break;
+        default:
+            return false;
+    }
+    return false;
 }

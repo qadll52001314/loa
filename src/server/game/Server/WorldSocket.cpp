@@ -23,7 +23,6 @@
 #include "ScriptMgr.h"
 #include "SHA1.h"
 #include "PacketLog.h"
-#include "LuaEngine.h"
 #include <memory>
 
 using boost::asio::ip::tcp;
@@ -171,8 +170,6 @@ bool WorldSocket::ReadDataHandler()
         case CMSG_KEEP_ALIVE:
             TC_LOG_DEBUG("network", "%s", GetOpcodeNameForLogging(opcode).c_str());
             sScriptMgr->OnPacketReceive(_worldSession, packet);
-            if (!sEluna->OnPacketReceive(_worldSession, packet))
-                break;
             break;
         default:
         {

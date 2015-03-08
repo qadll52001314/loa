@@ -9,10 +9,10 @@
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 message(" - World")
-file(GLOB_RECURSE scripts_World World/*.cpp World/*.h)
-source_group("World" FILES ${scripts_World})
+file(GLOB_RECURSE sources_World World/*.cpp World/*.h)
+source_group("World" FILES ${sources_World})
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  ${scripts_World}
+  ${sources_World}
 )
