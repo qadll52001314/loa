@@ -3272,3 +3272,11 @@ PacketSpoof.BanDuration = 86400
 
 #
 ###################################################################################################
+
+# legacy related - poorly named
+
+PvPEffeciency = 1
+MaxLegacyLevel = 80
+SupremacyStatsPerLevel = 3
+RewardExpansion = 0
+

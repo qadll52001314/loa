@@ -51,6 +51,7 @@
 #include "WaypointMovementGenerator.h"
 #include "World.h"
 #include "WorldPacket.h"
+#include "CapitalCityMgr.h"
 
 #include "Transport.h"
 
@@ -2728,3 +2729,24 @@ void Creature::StartPickPocketRefillTimer()
     _pickpocketLootRestore = time(NULL) + sWorld->getIntConfig(CONFIG_CREATURE_PICKPOCKET_REFILL);
 }
 
+CapitalCity* Creature::GetCapitalCity()
+{
+    return xCapitalCityMgr->FactionBelongsTo(GetFactionTemplateEntry()->faction);
+}
+
+bool Creature::CanLoot()
+{
+    const CreatureTemplate* proto = GetCreatureTemplate();
+    if (!proto)
+        return false;
+    if (sWorld->getIntConfig(CONFIG_REWARD_EXPANSION) >= proto->expansion)
+        return true;
+    return false;
+}
+
+uint32 Creature::GetCapitalCityRank()
+{
+    if (CapitalCity* city = GetCapitalCity())
+        return city->GetLevel();
+    return 0;
+}

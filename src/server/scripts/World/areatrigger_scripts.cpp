@@ -480,6 +480,8 @@ public:
 
     bool OnTrigger(Player* player, AreaTriggerEntry const* /*trigger*/) override
     {
+        if (irand(0, 9) != 0)
+            return false;
         if (!player->HasAura(81465))
             player->CastSpell(player, 81465, true);
         return false;

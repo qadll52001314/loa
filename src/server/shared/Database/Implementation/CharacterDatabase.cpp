@@ -613,7 +613,7 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     PrepareStatement(CHAR_SEL_CHECKED_SINGLE_TIME_GOSSIP, "SELECT menu_id, option_id FROM character_checked_gossip WHERE guid = ?", CONNECTION_SYNCH);
 
     PrepareStatement(CHAR_REP_RESOURCE_POINT, "REPLACE INTO resource_point_state (area, controlBy, guardCount, workerCount) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
-    PrepareStatement(CHAR_REP_CAPITAL_CITY, "REPLACE INTO capital_city_state (zone, resource, magic, level) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_REP_CAPITAL_CITY, "REPLACE INTO capital_city_state (ID, Resource, MagicPower, Level, UpgradeResource, UpgradeMagicPower) VALUES (?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_UPD_WAR_SCHOOL, "UPDATE characters SET WarSchool = ? WHERE guid = ?", CONNECTION_ASYNC);
     PrepareStatement(CHAR_REP_SUPREMACY_STATS, "REPLACE INTO character_supremacy (guid, strength, agility, stamina, intellect, spirit) VALUES(?,?,?,?,?,?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_SEL_SUPREMACY_STATS, "SELECT strength, agility, stamina, intellect, spirit FROM character_supremacy WHERE guid = ?", CONNECTION_SYNCH);

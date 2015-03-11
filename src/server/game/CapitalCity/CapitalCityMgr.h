@@ -4,18 +4,43 @@
 #include "CapitalCity.h"
 #include "Player.h"
 
-typedef std::map<uint32, CapitalCity*> CapitalCityMap;
-
-enum CapitalCityArea
+struct CapitalCityUpgradeCost
 {
-    CC_ORGRIMMAR = 1637,
-    CC_THUNDERBLUFF = 1638,
-    CC_UNDERCITY = 1497,
-    CC_SILVERMOON = 3487,
-    CC_STORMWIND = 1519,
-    CC_IRONFORGE = 1537,
-    CC_DARNASSUS = 1657,
-    CC_EXODAR = 3557
+    uint32 resource;
+    uint32 magicPower;
+};
+
+struct CapitalCityUpgradeSpell
+{
+    uint32 rank;
+    uint32 spell;
+    uint32 description;
+    uint32 reqCityRank;
+    uint32 reqItem1;
+    uint32 reqItem2;
+    uint32 reqItem3;
+    uint32 reqItem4;
+    uint32 reqItemCount1;
+    uint32 reqItemCount2;
+    uint32 reqItemCount3;
+    uint32 reqItemCount4;
+};
+
+typedef std::map<uint32, CapitalCity*> CapitalCityMap;
+typedef std::map<uint32, CapitalCityUpgradeCost> CapitalCityUpgradeInfoMap;
+typedef std::multimap<uint32, uint32> CapitalCityUpgradeSpellSet;
+typedef std::map<uint32, CapitalCityUpgradeSpell> CapitalCityUpgradeSpellList;
+
+enum CapitalCityIDs
+{
+    CC_ORGRIMMAR = 4,
+    CC_THUNDERBLUFF = 5,
+    CC_UNDERCITY = 1,
+    CC_SILVERMOON = 7,
+    CC_STORMWIND = 2,
+    CC_IRONFORGE = 3,
+    CC_DARNASSUS = 6,
+    CC_EXODAR = 8
 };
 
 class CapitalCityMgr
@@ -30,21 +55,28 @@ public:
         return &instance;
     }
 
-    void Update(uint32 diff);
+    void Update();
     void LoadCapitalCities();
-    CapitalCity* GetCapitalCity(uint32 area) const;
+    CapitalCity* GetCapitalCityByZone(uint32 zone) const;
+    CapitalCity* GetCapitalCityByID(uint32 id) const;
     void Save();
 
     void SendStateTo(Player*, uint32 index, uint32 value);
     void ClearStateOf(Player*, uint32 index);
 
-    void HandlePlayerEnter(Player*, uint32 area);
-    void HandlePlayerLeave(Player*, uint32 area);
+    void HandlePlayerEnter(Player*, uint32 zone);
+    void HandlePlayerLeave(Player*, uint32 zone);
 
     bool ReachedRequiredRank(Creature* creature, uint32 rank);
     CapitalCity* FactionBelongsTo(uint32 faction);
+
+    uint32 ResourceToNextLevel(uint32 nextLevel);
+    uint32 MagicPowerToNextLevel(uint32 nextLevel);
 private:
     CapitalCityMap m_CapitalCities;
+    CapitalCityUpgradeInfoMap m_UpgradeInfo;
+    CapitalCityUpgradeSpellSet m_UpgradeSpellSet;
+    CapitalCityUpgradeSpellList m_UpgradeSpellList;
 };
 
 #define xCapitalCityMgr CapitalCityMgr::instance()

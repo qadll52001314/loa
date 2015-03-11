@@ -1297,8 +1297,9 @@ void World::LoadConfigSettings(bool reload)
 
     // legacy
     m_int_configs[CONFIG_MAX_PLAYER_LEVEL_LEGACY] = sConfigMgr->GetIntDefault("MaxLegacyLevel", 80);
-    m_float_configs[RATE_PVP_EFFECIENCY] = sConfigMgr->GetFloatDefault("Rate.PvPEffeciency", 1.0f);
+    m_float_configs[RATE_PVP_EFFECIENCY] = sConfigMgr->GetFloatDefault("PvPEffeciency", 1.0f);
     m_int_configs[CONFIG_SUPREMACY_STATS_PER_LEVEL] = sConfigMgr->GetIntDefault("SupremacyStatsPerLevel", 3);
+    m_int_configs[CONFIG_REWARD_EXPANSION] = sConfigMgr->GetIntDefault("RewardExpansion", 0);
 
     // call ScriptMgr if we're reloading the configuration
     if (reload)
@@ -1793,6 +1794,8 @@ void World::SetInitialWorldSettings()
 
     m_timers[WUPDATE_PINGDB].SetInterval(getIntConfig(CONFIG_DB_PING_INTERVAL)*MINUTE*IN_MILLISECONDS);    // Mysql ping time in minutes
 
+    m_timers[WUPDATE_CAPITALCITY].SetInterval(3*IN_MILLISECONDS);
+
     //to set mailtimer to return mails every day between 4 and 5 am
     //mailtimer is increased when updating auctions
     //one second is 1000 -(tested on win system)
@@ -2174,6 +2177,12 @@ void World::Update(uint32 diff)
         CharacterDatabase.KeepAlive();
         LoginDatabase.KeepAlive();
         WorldDatabase.KeepAlive();
+    }
+
+    if (m_timers[WUPDATE_CAPITALCITY].Passed())
+    {
+        m_timers[WUPDATE_CAPITALCITY].Reset();
+        xCapitalCityMgr->Update();
     }
 
     // update the instance reset times

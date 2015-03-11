@@ -5030,7 +5030,7 @@ void Player::DeleteOldCharacters()
  */
 void Player::DeleteOldCharacters(uint32 keepDays)
 {
-    TC_LOG_INFO("entities.player", "Player::DeleteOldChars: Deleting all characters which have been deleted %u days before...", keepDays);
+    TC_LOG_INFO("entities.player", "Player::DeleteOldChars: Removing characters older than %u day(s)", keepDays);
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHAR_OLD_CHARS);
     stmt->setUInt32(0, uint32(time(NULL) - time_t(keepDays * DAY)));
@@ -5038,7 +5038,7 @@ void Player::DeleteOldCharacters(uint32 keepDays)
 
     if (result)
     {
-         TC_LOG_DEBUG("entities.player", "Player::DeleteOldChars: Found " UI64FMTD " character(s) to delete", result->GetRowCount());
+         TC_LOG_DEBUG("entities.player", "Player::DeleteOldChars: " UI64FMTD " character(s) to remove", result->GetRowCount());
          do
          {
             Field* fields = result->Fetch();
@@ -6670,20 +6670,20 @@ void Player::SendActionButtons(uint32 state) const
     }
 
     GetSession()->SendPacket(&data);
-    TC_LOG_INFO("network", "SMSG_ACTION_BUTTONS sent '%u' spec '%u' Sent", GetGUIDLow(), m_activeSpec);
+    TC_LOG_DEBUG("network", "SMSG_ACTION_BUTTONS sent '%u' spec '%u' Sent", GetGUIDLow(), m_activeSpec);
 }
 
 bool Player::IsActionButtonDataValid(uint8 button, uint32 action, uint8 type)
 {
     if (button >= MAX_ACTION_BUTTONS)
     {
-        TC_LOG_ERROR("entities.player", "Action %u not added into button %u for player %s (GUID: %u): button must be < %u", action, button, GetName().c_str(), GetGUIDLow(), MAX_ACTION_BUTTONS );
+        TC_LOG_DEBUG("entities.player", "Action %u not added into button %u for player %s (GUID: %u): button must be < %u", action, button, GetName().c_str(), GetGUIDLow(), MAX_ACTION_BUTTONS );
         return false;
     }
 
     if (action >= MAX_ACTION_BUTTON_ACTION_VALUE)
     {
-        TC_LOG_ERROR("entities.player", "Action %u not added into button %u for player %s (GUID: %u): action must be < %u", action, button, GetName().c_str(), GetGUIDLow(), MAX_ACTION_BUTTON_ACTION_VALUE);
+        TC_LOG_DEBUG("entities.player", "Action %u not added into button %u for player %s (GUID: %u): action must be < %u", action, button, GetName().c_str(), GetGUIDLow(), MAX_ACTION_BUTTON_ACTION_VALUE);
         return false;
     }
 
@@ -6692,20 +6692,20 @@ bool Player::IsActionButtonDataValid(uint8 button, uint32 action, uint8 type)
         case ACTION_BUTTON_SPELL:
             if (!sSpellMgr->GetSpellInfo(action))
             {
-                TC_LOG_ERROR("entities.player", "Spell action %u not added into button %u for player %s (GUID: %u): spell not exist", action, button, GetName().c_str(), GetGUIDLow());
+                TC_LOG_DEBUG("entities.player", "Spell action %u not added into button %u for player %s (GUID: %u): spell not exist", action, button, GetName().c_str(), GetGUIDLow());
                 return false;
             }
 
             if (!HasSpell(action))
             {
-                TC_LOG_ERROR("entities.player", "Spell action %u not added into button %u for player %s (GUID: %u): player don't known this spell", action, button, GetName().c_str(), GetGUIDLow());
+                TC_LOG_DEBUG("entities.player", "Spell action %u not added into button %u for player %s (GUID: %u): player don't known this spell", action, button, GetName().c_str(), GetGUIDLow());
                 return false;
             }
             break;
         case ACTION_BUTTON_ITEM:
             if (!sObjectMgr->GetItemTemplate(action))
             {
-                TC_LOG_ERROR("entities.player", "Item action %u not added into button %u for player %s (GUID: %u): item not exist", action, button, GetName().c_str(), GetGUIDLow());
+                TC_LOG_DEBUG("entities.player", "Item action %u not added into button %u for player %s (GUID: %u): item not exist", action, button, GetName().c_str(), GetGUIDLow());
                 return false;
             }
             break;
@@ -6715,7 +6715,7 @@ bool Player::IsActionButtonDataValid(uint8 button, uint32 action, uint8 type)
         case ACTION_BUTTON_EQSET:
             break;
         default:
-            TC_LOG_ERROR("entities.player", "Unknown action type %u", type);
+            TC_LOG_DEBUG("entities.player", "Unknown action type %u", type);
             return false;                                          // other cases not checked at this moment
     }
 
@@ -6917,7 +6917,7 @@ void Player::CheckAreaExploreAndOutdoor()
                 GiveXP(XP, NULL);
                 SendExplorationExperience(area, XP);
             }
-            TC_LOG_INFO("entities.player", "Player %u discovered a new area: %u", GetGUIDLow(), area);
+            TC_LOG_DEBUG("entities.player", "Player %u discovered a new area: %u", GetGUIDLow(), area);
         }
     }
 }
@@ -7805,7 +7805,7 @@ void Player::_ApplyItemMods(Item* item, uint8 slot, bool apply)
     if (item->IsBroken())
         return;
 
-    TC_LOG_INFO("entities.player.items", "applying mods for item %u ", item->GetGUIDLow());
+    TC_LOG_DEBUG("entities.player.items", "applying mods for item %u ", item->GetGUIDLow());
 
     uint8 attacktype = Player::GetAttackBySlot(slot);
 
@@ -9816,7 +9816,7 @@ uint32 Player::GetXPRestBonus(uint32 xp)
 
     SetRestBonus(GetRestBonus() - rested_bonus);
 
-    TC_LOG_INFO("entities.player", "Player gain %u xp (+ %u Rested Bonus). Rested points=%f", xp+rested_bonus, rested_bonus, GetRestBonus());
+    TC_LOG_DEBUG("entities.player", "Player gain %u xp (+ %u Rested Bonus). Rested points=%f", xp+rested_bonus, rested_bonus, GetRestBonus());
     return rested_bonus;
 }
 
@@ -18079,7 +18079,7 @@ void Player::_LoadAuras(PreparedQueryResult result, uint32 timediff)
 
                 aura->SetLoadedState(maxduration, remaintime, remaincharges, stackcount, recalculatemask, &damage[0]);
                 aura->ApplyForTargets();
-                TC_LOG_INFO("entities.player", "Added aura spellid %u, effectmask %u", spellInfo->Id, effmask);
+                TC_LOG_DEBUG("entities.player", "Added aura spellid %u, effectmask %u", spellInfo->Id, effmask);
             }
         }
         while (result->NextRow());
@@ -20753,8 +20753,6 @@ void Player::PetSpellInitialize()
     if (!pet)
         return;
 
-    TC_LOG_DEBUG("entities.pet", "Pet Spells Groups");
-
     CharmInfo* charmInfo = pet->GetCharmInfo();
 
     WorldPacket data(SMSG_PET_SPELLS, 8+2+4+4+4*MAX_UNIT_ACTION_BAR_INDEX+1+1);
@@ -20764,6 +20762,8 @@ void Player::PetSpellInitialize()
     data << uint8(pet->GetReactState());
     data << uint8(charmInfo->GetCommandState());
     data << uint16(0); // Flags, mostly unknown
+
+    TC_LOG_DEBUG("entities.pet", "Player::PetspellInitialize: Creating spellgroups for summoned pet");
 
     // action bar loop
     charmInfo->BuildActionBar(&data);
@@ -21889,6 +21889,9 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
             return false;
         }
     }
+
+    if (crItem->ReqCityRank > creature->GetCapitalCityRank())
+        return false;
 
     uint32 price = 0;
     if (crItem->IsGoldRequired(pProto) && pProto->BuyPrice > 0) //Assume price cannot be negative (do not know why it is int32)
@@ -23716,14 +23719,14 @@ float Player::GetPriceDiscount(Creature const* creature) const
     if (!vendor_faction || !vendor_faction->faction)
         return factor;
 
-    if (InSameFaction(vendor_faction->ID))
+    if (InSameFaction(vendor_faction->faction))
         factor = 0.75f;
 
     //ReputationRank rank = GetReputationRank(vendor_faction->faction);
     //if (rank <= REP_NEUTRAL)
     //    return factor;
 
-    if (CapitalCity* city = xCapitalCityMgr->FactionBelongsTo(vendor_faction->ID))
+    if (CapitalCity* city = xCapitalCityMgr->FactionBelongsTo(vendor_faction->faction))
         factor *= (std::pow(0.95f, city->GetLevel()));
 
     return factor;
@@ -25559,7 +25562,7 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
     LearnSpell(spellid, false);
     AddTalent(spellid, m_activeSpec, true);
 
-    TC_LOG_INFO("entities.player", "TalentID: %u Rank: %u Spell: %u Spec: %u\n", talentId, talentRank, spellid, m_activeSpec);
+    TC_LOG_DEBUG("entities.player", "TalentID: %u Rank: %u Spell: %u Spec: %u\n", talentId, talentRank, spellid, m_activeSpec);
 
     // update free talent points
     SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
@@ -25694,7 +25697,7 @@ void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRa
 
     // learn! (other talent ranks will unlearned at learning)
     pet->learnSpell(spellid);
-    TC_LOG_INFO("entities.player", "PetTalentID: %u Rank: %u Spell: %u\n", talentId, talentRank, spellid);
+    TC_LOG_DEBUG("entities.player", "PetTalentID: %u Rank: %u Spell: %u\n", talentId, talentRank, spellid);
 
     // update free talent points
     pet->SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
@@ -27259,40 +27262,40 @@ void Player::UpdateLegacyItemRecord(int item)
 
 uint32 Player::GetCapitalCityLevel()
 {
-    uint32 capitalZone = 0;
+    uint32 capitalCity = 0;
     switch (getRace())
     {
         case RACE_ORC:
         case RACE_TROLL:
-            capitalZone = 1637;
+            capitalCity = CC_ORGRIMMAR;
             break;
         case RACE_TAUREN:
-            capitalZone = 1638;
+            capitalCity = CC_THUNDERBLUFF;
             break;
         case RACE_UNDEAD_PLAYER:
-            capitalZone = 1497;
+            capitalCity = CC_UNDERCITY;
             break;
         case RACE_BLOODELF:
-            capitalZone = 3487;
+            capitalCity = CC_SILVERMOON;
             break;
         case RACE_HUMAN:
-            capitalZone = 1519;
+            capitalCity = CC_STORMWIND;
             break;
         case RACE_DWARF:
         case RACE_GNOME:
-            capitalZone = 1537;
+            capitalCity = CC_IRONFORGE;
             break;
         case RACE_NIGHTELF:
-            capitalZone = 1657;
+            capitalCity = CC_DARNASSUS;
             break;
         case RACE_DRAENEI:
-            capitalZone = 3557;
+            capitalCity = CC_EXODAR;
             break;
         default:
             return 0;
     }
 
-    CapitalCity* city = xCapitalCityMgr->GetCapitalCity(capitalZone);
+    CapitalCity* city = xCapitalCityMgr->GetCapitalCityByZone(capitalCity);
     if (city)
         return city->GetLevel();
     return 0;
@@ -27303,37 +27306,37 @@ bool Player::InSameFaction(uint32 faction) const
     switch (getRace())
     {
         case RACE_BLOODELF:
-            if (faction == 1603 || faction == 1604)
+            if (faction == 911)
                 return true;
             break;
         case RACE_DRAENEI:
-            if (faction == 1638 || faction == 1639)
+            if (faction == 930)
                 return true;
             break;
         case RACE_DWARF:
         case RACE_GNOME:
-            if (faction == 55 || faction == 57)
+            if (faction == 47 || faction == 54)
                 return true;
             break;
         case RACE_HUMAN:
-            if (faction == 11 || faction == 12)
+            if (faction == 72)
                 return true;
             break;
         case RACE_NIGHTELF:
-            if (faction == 79 || faction == 80)
+            if (faction == 69)
                 return true;
             break;
         case RACE_ORC:
         case RACE_TROLL:
-            if (faction == 19 || faction == 126)
+            if (faction == 76 || faction == 530)
                 return true;
             break;
         case RACE_TAUREN:
-            if (faction == 104 || faction == 105)
+            if (faction == 81)
                 return true;
             break;
         case RACE_UNDEAD_PLAYER:
-            if (faction == 68 || faction == 71)
+            if (faction == 68)
                 return true;
             break;
         default:

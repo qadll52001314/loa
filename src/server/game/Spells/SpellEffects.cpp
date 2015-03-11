@@ -4233,7 +4233,7 @@ void Spell::EffectStuck(SpellEffIndex /*effIndex*/)
         return;
 
     TC_LOG_DEBUG("spells", "Spell Effect: Stuck");
-    TC_LOG_INFO("spells", "Player %s (guid %u) used auto-unstuck future at map %u (%f, %f, %f)", player->GetName().c_str(), player->GetGUIDLow(), player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+    TC_LOG_DEBUG("spells", "Player %s (guid %u) used auto-unstuck future at map %u (%f, %f, %f)", player->GetName().c_str(), player->GetGUIDLow(), player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
 
     if (player->IsInFlight())
         return;
@@ -6200,7 +6200,7 @@ void Spell::EffectGrantCityResource(SpellEffIndex effIndex)
     int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
     if (!cityIndex || !value) return;
 
-    CapitalCity* city = xCapitalCityMgr->GetCapitalCity(cityIndex);
+    CapitalCity* city = xCapitalCityMgr->GetCapitalCityByID(cityIndex);
     if (!city) return;
 
     city->AddResource(value, unitTarget->ToPlayer());
@@ -6232,7 +6232,7 @@ void Spell::EffectGrantCityMagicPower(SpellEffIndex effIndex)
     int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
     if (!cityIndex || !value) return;
 
-    CapitalCity* city = xCapitalCityMgr->GetCapitalCity(cityIndex);
+    CapitalCity* city = xCapitalCityMgr->GetCapitalCityByID(cityIndex);
     if (!city) return;
 
     city->AddMagicPower(value, unitTarget->ToPlayer());

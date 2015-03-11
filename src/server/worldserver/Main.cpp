@@ -47,6 +47,8 @@
 #include "SystemConfig.h"
 #include "WorldSocket.h"
 #include "WorldSocketMgr.h"
+#include "CapitalCityMgr.h"
+#include "ResourcePointMgr.h"
 
 using namespace boost::program_options;
 
@@ -257,6 +259,8 @@ int mainImpl(int argc, char** argv)
     sObjectAccessor->UnloadAll();             // unload 'i_player2corpse' storage and remove from world
     sScriptMgr->Unload();
     sOutdoorPvPMgr->Die();
+    xCapitalCityMgr->Save();
+    xResourcePointMgr->Save();
 
     // set server offline
     LoginDatabase.DirectPExecute("UPDATE realmlist SET flag = flag | %u WHERE id = '%d'", REALM_FLAG_OFFLINE, realmID);

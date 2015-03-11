@@ -166,12 +166,12 @@ enum NorthrendBeasts
 
 enum AnnouncerMessages
 {
-    MSG_BEASTS                 = 724001,
-    MSG_JARAXXUS               = 724002,
-    MSG_CRUSADERS              = 724003,
-    MSG_VALKIRIES              = 724004,
-    MSG_LICH_KING              = 724005,
-    MSG_ANUBARAK               = 724006
+    MSG_BEASTS                 = 31109,
+    MSG_JARAXXUS               = 31110,
+    MSG_CRUSADERS              = 31111,
+    MSG_VALKIRIES              = 31112,
+    MSG_LICH_KING              = 31113,
+    MSG_ANUBARAK               = 31114
 };
 
 enum CreatureIds

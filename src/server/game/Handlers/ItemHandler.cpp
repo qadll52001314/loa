@@ -776,6 +776,9 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
         {
             if (ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(item->item))
             {
+                if (item->ReqCityRank > vendor->GetCapitalCityRank())
+                    continue;
+
                 if (!(itemTemplate->AllowableClass & _player->getClassMask()) && itemTemplate->Bonding == BIND_WHEN_PICKED_UP && !_player->IsGameMaster())
                     continue;
                 // Only display items in vendor lists for the team the

@@ -56,6 +56,7 @@ EndContentData */
 #include "SpellAuras.h"
 #include "Pet.h"
 #include "CreatureTextMgr.h"
+#include "CapitalCityMgr.h"
 
 /*########
 # npc_air_force_bots
@@ -2378,6 +2379,67 @@ public:
     }
 };
 
+enum CCGeneralGossips
+{
+    CC_GOSSIP_MENU_UPGRADE_ORGRIMMAR = 55032,
+
+    CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR = 31105,
+
+    CC_GOSSIP_ITEM_UPGRADE_ORGRIMMAR_UPGRADE = 0,
+
+    CC_GOSSIP_ACTION_UPGRADE_MENU = 0
+};
+
+class capital_city_general : public CreatureScript
+{
+public:
+    capital_city_general() : CreatureScript("capital_city_general") { }
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        CapitalCity* city = creature->GetCapitalCity();
+        if (!city)
+            return false;
+
+        player->PlayerTalkClass->ClearMenus();
+
+        switch (city->GetID())
+        {
+            case CC_ORGRIMMAR:
+                player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_UPGRADE_ORGRIMMAR, CC_GOSSIP_ITEM_UPGRADE_ORGRIMMAR_UPGRADE, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_UPGRADE_MENU);
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR, creature->GetGUID());
+                break;
+            case CC_THUNDERBLUFF:
+                break;
+            case CC_UNDERCITY:
+                break;
+            case CC_SILVERMOON:
+                break;
+            case CC_STORMWIND:
+                break;
+            case CC_IRONFORGE:
+                break;
+            case CC_DARNASSUS:
+                break;
+            case CC_EXODAR:
+                break;
+            default:
+                return false;
+        }
+
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
+    {
+        CapitalCity* city = creature->GetCapitalCity();
+        if (!city)
+            return false;
+
+        return true;
+    }
+};
+
 void AddSC_npcs_special()
 {
     new npc_air_force_bots();
@@ -2400,4 +2462,5 @@ void AddSC_npcs_special()
     new npc_firework();
     new npc_spring_rabbit();
     new npc_imp_in_a_ball();
+    new capital_city_general();
 }
