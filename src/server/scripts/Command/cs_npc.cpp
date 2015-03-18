@@ -335,6 +335,10 @@ public:
 
         char* fextendedcost = strtok(NULL, " ");                //add ExtendedCost, default: 0
         uint32 extendedcost = fextendedcost ? atoul(fextendedcost) : 0;
+
+        char* freqcityrank = strtok(NULL, " ");                //add ExtendedCost, default: 0
+        uint32 reqCityRank = freqcityrank ? atoul(freqcityrank) : 0;
+
         Creature* vendor = handler->getSelectedCreature();
         if (!vendor)
         {
@@ -351,11 +355,11 @@ public:
             return false;
         }
 
-        sObjectMgr->AddVendorItem(vendor_entry, itemId, maxcount, incrtime, extendedcost);
+        sObjectMgr->AddVendorItem(vendor_entry, itemId, maxcount, incrtime, extendedcost, reqCityRank);
 
         ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(itemId);
 
-        handler->PSendSysMessage(LANG_ITEM_ADDED_TO_LIST, itemId, itemTemplate->Name1.c_str(), maxcount, incrtime, extendedcost);
+        handler->PSendSysMessage(LANG_ITEM_ADDED_TO_LIST, itemId, itemTemplate->Name1.c_str(), maxcount, incrtime, extendedcost, reqCityRank);
         return true;
     }
 

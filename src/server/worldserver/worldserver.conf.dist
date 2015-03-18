@@ -3280,3 +3280,13 @@ MaxLegacyLevel = 80
 SupremacyStatsPerLevel = 3
 RewardExpansion = 0
 
+Rate.Creature.Health.Exp0 = 1
+Rate.Creature.Health.Exp1 = 2
+Rate.Creature.Health.Exp2 = 4
+Rate.Creature.Damage.Exp0 = 1
+Rate.Creature.Damage.Exp1 = 2
+Rate.Creature.Damage.Exp2 = 4
+Rate.Creature.SDamage.Exp0 = 1
+Rate.Creature.SDamage.Exp1 = 2
+Rate.Creature.SDamage.Exp2 = 4
+

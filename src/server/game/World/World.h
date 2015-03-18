@@ -421,6 +421,15 @@ enum Rates
     RATE_MONEY_QUEST,
     RATE_MONEY_MAX_LEVEL_QUEST,
     RATE_PVP_EFFECIENCY,
+    RATE_CREATURE_HEALTH_EXP0,
+    RATE_CREATURE_HEALTH_EXP1,
+    RATE_CREATURE_HEALTH_EXP2,
+    RATE_CREATURE_DAMAGE_EXP0,
+    RATE_CREATURE_DAMAGE_EXP1,
+    RATE_CREATURE_DAMAGE_EXP2,
+    RATE_CREATURE_SDAMAGE_EXP0,
+    RATE_CREATURE_SDAMAGE_EXP1,
+    RATE_CREATURE_SDAMAGE_EXP2,
     MAX_RATES
 };
 
@@ -768,6 +777,8 @@ class World
         void SendGlobalNotificationToFaction(const char* message, uint32 faction);
         void SendGlobalChatMessageToFaction(const char* message, uint32 faction);
         void UpdateWorldStateInZone(uint32 zone, uint32 index, uint64 value);
+
+        void AddGlobalSpellsToTeam(uint32 spell, uint32 team);
 
     protected:
         void _UpdateGameTime();

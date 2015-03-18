@@ -2381,13 +2381,27 @@ public:
 
 enum CCGeneralGossips
 {
-    CC_GOSSIP_MENU_UPGRADE_ORGRIMMAR = 55032,
+    CC_GOSSIP_MENU_UPGRADE = 55032,
 
     CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR = 31105,
+    CC_GOSSIP_TEXT_UPGRADE_UNDERCITY = 31106,
+    CC_GOSSIP_TEXT_UPGRADE_SILVERMOON = 31107,
+    CC_GOSSIP_TEXT_UPGRADE_THUNDERBLUFF = 31108,
+    CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR_TROLL = 31109,
+    CC_GOSSIP_TEXT_UPGRADE_STORMWIND = 31110,
+    CC_GOSSIP_TEXT_UPGRADE_IRONFORGE = 31111,
+    CC_GOSSIP_TEXT_UPGRADE_DARNASSUS = 31112,
+    CC_GOSSIP_TEXT_UPGRADE_EXODAR = 31113,
+    CC_GOSSIP_TEXT_UPGRADE_IRONFORGE_GNOME = 31114,
 
-    CC_GOSSIP_ITEM_UPGRADE_ORGRIMMAR_UPGRADE = 0,
+    CC_GOSSIP_ITEM_UPGRADE_START = 0,
+    CC_GOSSIP_ITEM_UPGRADE_STOP  = 1,
+};
 
-    CC_GOSSIP_ACTION_UPGRADE_MENU = 0
+enum CCGeneralGossipActions
+{
+    CC_GOSSIP_ACTION_UPGRADE_START = 1001,
+    CC_GOSSIP_ACTION_UPGRADE_STOP,
 };
 
 class capital_city_general : public CreatureScript
@@ -2403,25 +2417,41 @@ public:
 
         player->PlayerTalkClass->ClearMenus();
 
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_UPGRADE, CC_GOSSIP_ITEM_UPGRADE_START, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_UPGRADE_START);
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_UPGRADE, CC_GOSSIP_ITEM_UPGRADE_STOP, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_UPGRADE_STOP);
+
+        player->PrepareQuestMenu(creature->GetGUID());
+
         switch (city->GetID())
         {
             case CC_ORGRIMMAR:
-                player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_UPGRADE_ORGRIMMAR, CC_GOSSIP_ITEM_UPGRADE_ORGRIMMAR_UPGRADE, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_UPGRADE_MENU);
-                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR, creature->GetGUID());
+                if (creature->GetFactionTemplateEntry()->faction == 530)
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR_TROLL, creature->GetGUID());
+                else
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_ORGRIMMAR, creature->GetGUID());
                 break;
             case CC_THUNDERBLUFF:
                 break;
             case CC_UNDERCITY:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_UNDERCITY, creature->GetGUID());
                 break;
             case CC_SILVERMOON:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_SILVERMOON, creature->GetGUID());
                 break;
             case CC_STORMWIND:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_STORMWIND, creature->GetGUID());
                 break;
             case CC_IRONFORGE:
+                if (creature->GetFactionTemplateEntry()->faction == 54)
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_IRONFORGE_GNOME, creature->GetGUID());
+                else
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_IRONFORGE, creature->GetGUID());
                 break;
             case CC_DARNASSUS:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_DARNASSUS, creature->GetGUID());
                 break;
             case CC_EXODAR:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_UPGRADE_EXODAR, creature->GetGUID());
                 break;
             default:
                 return false;
@@ -2430,13 +2460,204 @@ public:
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        switch (action)
+        {
+            case CC_GOSSIP_ACTION_UPGRADE_START:
+                city->UpgradeStart(player);
+                player->CLOSE_GOSSIP_MENU();
+                break;
+            case CC_GOSSIP_ACTION_UPGRADE_STOP:
+                city->UpgradeStop(player);
+                player->CLOSE_GOSSIP_MENU();
+                break;
+            default:
+                break;
+        }
+
+        return true;
+    }
+};
+
+enum CapitalCityResearcherGossips
+{
+    CC_GOSSIP_MENU_RESEARCH = 55042,
+
+    CC_GOSSIP_TEXT_RESEARCH_ORGRIMMAR = 31119,
+    CC_GOSSIP_TEXT_RESEARCH_SILVERMOON = 31116,
+    CC_GOSSIP_TEXT_RESEARCH_UNDERCITY = 31117,
+    CC_GOSSIP_TEXT_RESEARCH_THUNDERBLUFF = 31118,
+    CC_GOSSIP_TEXT_RESEARCH_STORMWIND = 31121,
+    CC_GOSSIP_TEXT_RESEARCH_IRONFORGE = 31122,
+    CC_GOSSIP_TEXT_RESEARCH_DARNASSUS = 31123,
+    CC_GOSSIP_TEXT_RESEARCH_EXODAR = 31124,
+    CC_GOSSIP_TEXT_RESEARCH_ORGRIMMAR_TROLL = 31120,
+    CC_GOSSIP_TEXT_RESEARCH_IRONFORGE_GNOME = 31125,
+    CC_GOSSIP_TEXT_NO_RESEARCH_AVAILABLE = 31141,
+    CC_GOSSIP_TEXT_RESEARCH_LIST = 31142,
+    CC_GOSSIP_TEXT_RESEARCH_STARTED = 31143,
+
+    CC_GOSSIP_ITEM_RESEARCH_TRAIN = 0,
+    CC_GOSSIP_ITEM_RESEARCH_VENDOR = 1,
+    CC_GOSSIP_ITEM_RESEARCH_LIST = 2,
+    CC_GOSSIP_ITEM_RESEARCH_IN_PROGRESS = 3,
+    CC_GOSSIP_ITEM_RESEARCH_COMPLETED = 4,
+    CC_GOSSIP_ITEM_RESEARCH_START = 5
+};
+
+enum CCResearcherGossipActions
+{
+   CC_GOSSIP_ACTION_RESEARCH_TRAIN = 1001,
+   CC_GOSSIP_ACTION_RESEARCH_VENDOR,
+   CC_GOSSIP_ACTION_RESEARCH_OPEN_LIST,
+   CC_GOSSIP_ACTION_RESEARCH_IN_PROGRESS,
+   CC_GOSSIP_ACTION_RESEARCH_COMPLETED,
+   CC_GOSSIP_ACTION_RESEARCH_ITEM_START = 1100,
+   CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START = 10000,
+   CC_GOSSIP_ACTION_RESEARCH_START = 20000
+};
+
+class capital_city_researcher : public CreatureScript
+{
+public:
+    capital_city_researcher() : CreatureScript("capital_city_researcher") { }
+
+    bool OnGossipHello(Player* player, Creature* creature) override
     {
         CapitalCity* city = creature->GetCapitalCity();
         if (!city)
             return false;
 
+        player->PlayerTalkClass->ClearMenus();
+
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_TRAIN, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_TRAIN);
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_VENDOR, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_VENDOR);
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_LIST, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_OPEN_LIST);
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_IN_PROGRESS, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_IN_PROGRESS);
+        player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_COMPLETED, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_COMPLETED);
+
+        player->PrepareQuestMenu(creature->GetGUID());
+
+        switch (city->GetID())
+        {
+            case CC_ORGRIMMAR:
+                if (creature->GetFactionTemplateEntry()->faction == 530)
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_ORGRIMMAR_TROLL, creature->GetGUID());
+                else
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_ORGRIMMAR, creature->GetGUID());
+                break;
+            case CC_THUNDERBLUFF:
+                break;
+            case CC_UNDERCITY:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_UNDERCITY, creature->GetGUID());
+                break;
+            case CC_SILVERMOON:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_SILVERMOON, creature->GetGUID());
+                break;
+            case CC_STORMWIND:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_STORMWIND, creature->GetGUID());
+                break;
+            case CC_IRONFORGE:
+                if (creature->GetFactionTemplateEntry()->faction == 54)
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_IRONFORGE_GNOME, creature->GetGUID());
+                else
+                    player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_IRONFORGE, creature->GetGUID());
+                break;
+            case CC_DARNASSUS:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_DARNASSUS, creature->GetGUID());
+                break;
+            case CC_EXODAR:
+                player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_EXODAR, creature->GetGUID());
+                break;
+            default:
+                return false;
+        }
+
         return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        if (action < CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START)
+        {
+            switch (action)
+            {
+                case CC_GOSSIP_ACTION_RESEARCH_TRAIN:
+                    SendTrainingList(player, creature);
+                    break;
+                case CC_GOSSIP_ACTION_RESEARCH_VENDOR:
+                    SendVendorList(player, creature);
+                    break;
+                case CC_GOSSIP_ACTION_RESEARCH_OPEN_LIST:
+                    SendResearchList(player, creature);
+                    break;
+                case CC_GOSSIP_ACTION_RESEARCH_IN_PROGRESS:
+                    SendInProgressResearchList(player, creature);
+                    break;
+                case CC_GOSSIP_ACTION_RESEARCH_COMPLETED:
+                    SendCompletedResearchList(player, creature);
+                    break;
+            }
+        }
+        else if (action < CC_GOSSIP_ACTION_RESEARCH_START)
+        {
+            player->PlayerTalkClass->ClearMenus();
+            uint32 spellSet = action - CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START;
+            CapitalCityResearchState state = xCapitalCityMgr->GetResearchState(creature->GetEntry(), spellSet);
+            if (!state.spell)
+                return;
+
+            xCapitalCityMgr->SendResearchProgress(player, creature->GetEntry(), spellSet);
+            if (state.state == CC_RESEARCH_STATE_NOT_STARTED && xCapitalCityMgr->HaveAllReagentForNextResearch(creature->GetEntry(), spellSet))
+                player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_START, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_START + spellSet);
+            player->SEND_GOSSIP_MENU(state.spell->description, creature->GetGUID());
+        }
+        else
+        {
+            uint32 spellSet = action - CC_GOSSIP_ACTION_RESEARCH_START;
+            xCapitalCityMgr->StartNextAvailableResearch(creature->GetEntry(), spellSet);
+            player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_STARTED, creature->GetGUID());
+        }
+    }
+
+    void SendTrainingList(Player* player, Creature* creature)
+    {
+
+    }
+
+    void SendVendorList(Player* player, Creature* creature)
+    {
+
+    }
+
+    void SendInProgressResearchList(Player* player, Creature* creature)
+    {
+
+    }
+
+    void SendCompletedResearchList(Player* player, Creature* creature)
+    {
+
+    }
+
+    void SendResearchList(Player* player, Creature* creature)
+    {
+        player->PlayerTalkClass->ClearMenus();
+
+        CapitalCitySpellResearchSetList list = xCapitalCityMgr->GetResearchListForCreatureEntry(creature->GetEntry());
+        if (list.empty())
+        {
+            player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_NO_RESEARCH_AVAILABLE, creature->GetGUID());
+            return;
+        }
+
+        for (CapitalCitySpellResearchSetList::const_iterator itr = list.begin(); itr != list.end(); ++itr)
+        {
+            std::string name = xCapitalCityMgr->GetSpellSetName(*itr);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_INTERACT_1, name, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START + (*itr));
+            player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_LIST, creature->GetGUID());
+        }
     }
 };
 
@@ -2463,4 +2684,5 @@ void AddSC_npcs_special()
     new npc_spring_rabbit();
     new npc_imp_in_a_ball();
     new capital_city_general();
+    new capital_city_researcher();
 }

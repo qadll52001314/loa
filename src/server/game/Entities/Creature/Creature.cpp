@@ -1046,6 +1046,7 @@ void Creature::SelectLevel()
     CreatureTemplate const* cInfo = GetCreatureTemplate();
 
     uint32 rank = IsPet() ? 0 : cInfo->rank;
+    uint32 exp = IsPet() ? 0 : cInfo->expansion;
 
     // level
     uint8 minlevel = std::min(cInfo->maxlevel, cInfo->minlevel);
@@ -1056,7 +1057,7 @@ void Creature::SelectLevel()
     CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(level, cInfo->unit_class);
 
     // health
-    float healthmod = _GetHealthMod(rank);
+    float healthmod = _GetHealthMod(rank, exp);
 
     uint32 basehp = stats->GenerateHealth(cInfo);
     uint32 health = uint32(basehp * healthmod);
@@ -1098,23 +1099,49 @@ void Creature::SelectLevel()
     SetModifierValue(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, stats->RangedAttackPower);
 }
 
-float Creature::_GetHealthMod(int32 Rank)
+float Creature::_GetHealthMod(int32 Rank, int32 Exp)
 {
+    float rate = 1.0f;
     switch (Rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld->getRate(RATE_CREATURE_NORMAL_HP);
+            rate *= sWorld->getRate(RATE_CREATURE_NORMAL_HP);
+            break;
         case CREATURE_ELITE_ELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_HP);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_HP);
+            break;
         case CREATURE_ELITE_RAREELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_HP);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_HP);
+            break;
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_HP);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_HP);
+            break;
         case CREATURE_ELITE_RARE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RARE_HP);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RARE_HP);
+            break;
+        case RATE_CREATURE_ELITE_ELITE_HP:
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_HP);
+            break;
         default:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_HP);
+            break;
     }
+
+    switch (Exp)
+    {
+        case EXPANSION_CLASSIC:
+            rate *= sWorld->getRate(RATE_CREATURE_HEALTH_EXP0);
+            break;
+        case EXPANSION_THE_BURNING_CRUSADE:
+            rate *= sWorld->getRate(RATE_CREATURE_HEALTH_EXP1);
+            break;
+        case EXPANSION_WRATH_OF_THE_LICH_KING:
+            rate *= sWorld->getRate(RATE_CREATURE_HEALTH_EXP2);
+            break;
+        default:
+            break;
+    }
+
+    return rate;
 }
 
 void Creature::LowerPlayerDamageReq(uint32 unDamage)
@@ -1123,42 +1150,96 @@ void Creature::LowerPlayerDamageReq(uint32 unDamage)
         m_PlayerDamageReq > unDamage ? m_PlayerDamageReq -= unDamage : m_PlayerDamageReq = 0;
 }
 
-float Creature::_GetDamageMod(int32 Rank)
+float Creature::_GetDamageMod(int32 Rank, int32 Exp)
 {
+    float rate = 1.0f;
+
     switch (Rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld->getRate(RATE_CREATURE_NORMAL_DAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_NORMAL_DAMAGE);
+            break;
         case CREATURE_ELITE_ELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            break;
         case CREATURE_ELITE_RAREELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_DAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_DAMAGE);
+            break;
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_DAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_DAMAGE);
+            break;
         case CREATURE_ELITE_RARE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RARE_DAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RARE_DAMAGE);
+            break;
+        case RATE_CREATURE_ELITE_ELITE_HP:
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            break;
         default:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            break;
     }
+
+    switch (Exp)
+    {
+        case EXPANSION_CLASSIC:
+            rate *= sWorld->getRate(RATE_CREATURE_DAMAGE_EXP0);
+            break;
+        case EXPANSION_THE_BURNING_CRUSADE:
+            rate *= sWorld->getRate(RATE_CREATURE_DAMAGE_EXP1);
+            break;
+        case EXPANSION_WRATH_OF_THE_LICH_KING:
+            rate *= sWorld->getRate(RATE_CREATURE_DAMAGE_EXP2);
+            break;
+        default:
+            break;
+    }
+
+    return rate;
 }
 
-float Creature::GetSpellDamageMod(int32 Rank) const
+float Creature::GetSpellDamageMod(int32 Rank, int32 Exp) const
 {
+    float rate = 1.0f;
+
     switch (Rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld->getRate(RATE_CREATURE_NORMAL_SPELLDAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_NORMAL_SPELLDAMAGE);
+            break;
         case CREATURE_ELITE_ELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            break;
         case CREATURE_ELITE_RAREELITE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_SPELLDAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RAREELITE_SPELLDAMAGE);
+            break;
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE);
+            break;
         case CREATURE_ELITE_RARE:
-            return sWorld->getRate(RATE_CREATURE_ELITE_RARE_SPELLDAMAGE);
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_RARE_SPELLDAMAGE);
+            break;
+        case RATE_CREATURE_ELITE_ELITE_HP:
+            rate *= sWorld->getRate(RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            break;
         default:
-            return sWorld->getRate(RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            break;
     }
+
+    switch (Exp)
+    {
+        case EXPANSION_CLASSIC:
+            rate *= sWorld->getRate(RATE_CREATURE_SDAMAGE_EXP0);
+            break;
+        case EXPANSION_THE_BURNING_CRUSADE:
+            rate *= sWorld->getRate(RATE_CREATURE_SDAMAGE_EXP1);
+            break;
+        case EXPANSION_WRATH_OF_THE_LICH_KING:
+            rate *= sWorld->getRate(RATE_CREATURE_SDAMAGE_EXP2);
+            break;
+        default:
+            break;
+    }
+
+    return rate;
 }
 
 bool Creature::CreateFromProto(uint32 guidlow, uint32 entry, CreatureData const* data /*= nullptr*/, uint32 vehId /*= 0*/)
@@ -1251,7 +1332,7 @@ bool Creature::LoadCreatureFromDB(uint32 guid, Map* map, bool addToMap)
         curhealth = data->curhealth;
         if (curhealth)
         {
-            curhealth = uint32(curhealth*_GetHealthMod(GetCreatureTemplate()->rank));
+            curhealth = uint32(curhealth*_GetHealthMod(GetCreatureTemplate()->rank, GetCreatureTemplate()->expansion));
             if (curhealth < 1)
                 curhealth = 1;
         }
@@ -2747,6 +2828,6 @@ bool Creature::CanLoot()
 uint32 Creature::GetCapitalCityRank()
 {
     if (CapitalCity* city = GetCapitalCity())
-        return city->GetLevel();
+        return city->GetRank();
     return 0;
 }

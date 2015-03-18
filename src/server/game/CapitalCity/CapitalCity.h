@@ -16,13 +16,13 @@
 class CapitalCity
 {
 public:
-    CapitalCity() { m_Zone = 0; m_Faction = 0; m_Level = 1; m_Resource = 0; m_MagicPower = 0; }
+    CapitalCity() { m_Zone = 0; m_Team = 0; m_Rank = 1; m_Resource = 0; m_MagicPower = 0; m_UpgradeResource = 0; m_UpgradeMagicPower = 0; m_Upgrading = false; }
     ~CapitalCity() { }
 
     void Update();
     void SetResource(uint32 resource) { m_Resource = resource; }
-    void SetLevel(uint32 level) { m_Level = level; }
-    uint32 GetLevel() { return m_Level; }
+    void SetRank(uint32 rank) { m_Rank = rank; }
+    uint32 GetRank() { return m_Rank; }
     uint32 GetResource() { return m_Resource; }
 	void SetMagicPower(uint32 magic) { m_MagicPower = magic; }
 	uint32 GetMagicPower() { return m_MagicPower; }
@@ -30,16 +30,18 @@ public:
     uint32 GetUpgradeResource() { return m_UpgradeResource; }
     void SetUpgradeMagicPower(uint32 magic) { m_UpgradeMagicPower = magic; }
     uint32 GetUpgradeMagicPower() { return m_UpgradeMagicPower; }
-    void SetFaction(uint32 faction) { m_Faction = faction; }
-    uint32 GetFaction() { return m_Faction; }
+    void SetTeam(uint32 team) { m_Team = team; }
+    uint32 GetTeam() { return m_Team; }
     void SetZone(uint32 zone) { m_Zone = zone; }
     uint32 GetZone() { return m_Zone; }
     void AddResource(int32 resource, Player* player = NULL);
     void AddMagicPower(int32 magic, Player* player = NULL);
-    void LevelUp(bool sendUpdate);
+    void RankUp(bool sendUpdate);
     void SetID(uint32 id) { m_ID = id; }
     uint32 GetID() { return m_ID; }
     std::string GetName();
+    void UpgradeStart(Player* commander = NULL);
+    void UpgradeStop(Player* commander = NULL);
 
     void Save();
 
@@ -52,15 +54,20 @@ public:
     void ClearState(uint32 index);
     void SendAllState(Player*);
     void ClearAllState(Player*);
+
+    void SetUpgradeState(bool upgrading) { m_Upgrading = upgrading; }
+
+    void LearnRankUpSpells(uint32 rank);
 private:
     uint32 m_ID; // used for saving to db.
     uint32 m_Zone;
-    uint32 m_Faction;
-	uint32 m_Level;
+    uint32 m_Team;
+	uint32 m_Rank;
     uint32 m_Resource;
 	uint32 m_MagicPower;
     uint32 m_UpgradeResource;
     uint32 m_UpgradeMagicPower;
+    bool m_Upgrading;
 };
 
 #endif

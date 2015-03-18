@@ -484,6 +484,15 @@ void World::LoadConfigSettings(bool reload)
     rate_values[RATE_CREATURE_ELITE_RAREELITE_SPELLDAMAGE] = sConfigMgr->GetFloatDefault("Rate.Creature.Elite.RAREELITE.SpellDamage", 1.0f);
     rate_values[RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE] = sConfigMgr->GetFloatDefault("Rate.Creature.Elite.WORLDBOSS.SpellDamage", 1.0f);
     rate_values[RATE_CREATURE_ELITE_RARE_SPELLDAMAGE]      = sConfigMgr->GetFloatDefault("Rate.Creature.Elite.RARE.SpellDamage", 1.0f);
+    rate_values[RATE_CREATURE_HEALTH_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp0", 1.0f);
+    rate_values[RATE_CREATURE_HEALTH_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp1", 2.0f);
+    rate_values[RATE_CREATURE_HEALTH_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp2", 4.0f);
+    rate_values[RATE_CREATURE_DAMAGE_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp0", 1.0f);
+    rate_values[RATE_CREATURE_DAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp1", 2.0f);
+    rate_values[RATE_CREATURE_DAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp2", 4.0f);
+    rate_values[RATE_CREATURE_SDAMAGE_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp0", 1.0f);
+    rate_values[RATE_CREATURE_SDAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp1", 2.0f);
+    rate_values[RATE_CREATURE_SDAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp2", 4.0f);
     rate_values[RATE_CREATURE_AGGRO]  = sConfigMgr->GetFloatDefault("Rate.Creature.Aggro", 1.0f);
     rate_values[RATE_REST_INGAME]                    = sConfigMgr->GetFloatDefault("Rate.Rest.InGame", 1.0f);
     rate_values[RATE_REST_OFFLINE_IN_TAVERN_OR_CITY] = sConfigMgr->GetFloatDefault("Rate.Rest.Offline.InTavernOrCity", 1.0f);
@@ -3048,7 +3057,7 @@ void World::ResetRandomBG()
 {
     TC_LOG_INFO("misc", "Random BG status reset for all characters.");
 
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_BATTLEGROUND_RANDOM);
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_BATTLEGROUND_RANDOM_ALL);
     CharacterDatabase.Execute(stmt);
 
     for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
@@ -3303,4 +3312,19 @@ void World::UpdateWorldStateInZone(uint32 zone, uint32 index, uint64 value)
             itr->second->GetPlayer()->SendUpdateWorldState(index, value);
     }
     //&& (team == 0 || itr->second->GetPlayer()->GetTeam() == team))
+}
+
+void World::AddGlobalSpellsToTeam(uint32 spell, uint32 team)
+{
+    for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+    {
+        if (itr->second && itr->second->GetPlayer() && itr->second->GetPlayer()->GetTeam() == team)
+        {
+            Player* player = itr->second->GetPlayer();
+            if (player->IsInWorld())
+                player->LearnSpell(spell, true);
+            else
+                player->AddSpell(spell, true, true, true, false);
+        }
+    }
 }

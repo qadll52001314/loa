@@ -1161,6 +1161,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     // original spells
     LearnDefaultSkills();
     LearnCustomSpells();
+    LearnCapitalCitySpells();
 
     // original action bar
     for (PlayerCreateInfoActions::const_iterator action_itr = info->action.begin(); action_itr != info->action.end(); ++action_itr)
@@ -4858,7 +4859,19 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHARACTER_ARENA_STATS);
+            stmt->setUInt32(0, guid);
+            trans->Append(stmt);
+
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_AURA);
+            stmt->setUInt32(0, guid);
+            trans->Append(stmt);
+
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_PLAYER_BGDATA);
+            stmt->setUInt32(0, guid);
+            trans->Append(stmt);
+
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_BATTLEGROUND_RANDOM);
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
@@ -4951,10 +4964,6 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_PLAYER_BGDATA);
-            stmt->setUInt32(0, guid);
-            trans->Append(stmt);
-
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_GLYPHS);
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
@@ -4980,6 +4989,10 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
             trans->Append(stmt);
 
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_SKILLS);
+            stmt->setUInt32(0, guid);
+            trans->Append(stmt);
+
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_STATS);
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
@@ -17817,6 +17830,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     InitTalentForLevel();
     LearnDefaultSkills();
     LearnCustomSpells();
+    LearnCapitalCitySpells();
 
     // must be before inventory (some items required reputation check)
     m_reputationMgr->LoadFromDB(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_REPUTATION));
@@ -19814,6 +19828,7 @@ void Player::_SaveInventory(SQLTransaction& trans)
     }
     m_itemUpdateQueue.clear();
 }
+
 
 void Player::_SaveMail(SQLTransaction& trans)
 {
@@ -23248,6 +23263,7 @@ void Player::ResetSpells(bool myClassOnly)
 
     LearnDefaultSkills();
     LearnCustomSpells();
+    LearnCapitalCitySpells();
     LearnQuestRewardedSpells();
 }
 
@@ -23727,7 +23743,7 @@ float Player::GetPriceDiscount(Creature const* creature) const
     //    return factor;
 
     if (CapitalCity* city = xCapitalCityMgr->FactionBelongsTo(vendor_faction->faction))
-        factor *= (std::pow(0.95f, city->GetLevel()));
+        factor *= (std::pow(0.95f, city->GetRank()));
 
     return factor;
 }
@@ -24292,18 +24308,6 @@ void Player::UpdateAreaDependentAuras(uint32 newArea)
         if (itr->second->autocast && itr->second->IsFitToRequirements(this, m_zoneUpdateId, newArea))
             if (!HasAura(itr->second->spellId))
                 CastSpell(this, itr->second->spellId, true);
-
-    if (newArea == 4273 && GetVehicleCreatureBase() && GetPositionX() > 400) // Ulduar
-    {
-        switch (GetVehicleBase()->GetEntry())
-        {
-            case 33062:
-            case 33109:
-            case 33060:
-                GetVehicleCreatureBase()->DespawnOrUnsummon();
-                break;
-        }
-    }
 }
 
 uint32 Player::GetCorpseReclaimDelay(bool pvp) const
@@ -24434,7 +24438,7 @@ PartyResult Player::CanUninviteFromGroup(ObjectGuid guidMember) const
             return ERR_PARTY_LFG_BOOT_LIMIT;
 
         lfg::LfgState state = sLFGMgr->GetState(gguid);
-        if (state == lfg::LFG_STATE_BOOT)
+        if (sLFGMgr->IsVoteKickActive(gguid))
             return ERR_PARTY_LFG_BOOT_IN_PROGRESS;
 
         if (grp->GetMembersCount() <= lfg::LFG_GROUP_KICK_VOTES_NEEDED)
@@ -27297,7 +27301,7 @@ uint32 Player::GetCapitalCityLevel()
 
     CapitalCity* city = xCapitalCityMgr->GetCapitalCityByZone(capitalCity);
     if (city)
-        return city->GetLevel();
+        return city->GetRank();
     return 0;
 }
 
@@ -27343,4 +27347,19 @@ bool Player::InSameFaction(uint32 faction) const
             return false;
     }
     return false;
+}
+
+void Player::LearnCapitalCitySpells()
+{
+    CapitalCitySpellList list = xCapitalCityMgr->GetLearnableSpellsForTeam(GetTeam());
+    if (list.empty())
+        return;
+
+    for (CapitalCitySpellList::const_iterator itr = list.begin(); itr != list.end(); ++itr)
+    {
+        if (!IsInWorld())                                    // will send in INITIAL_SPELLS in list anyway at map add
+            AddSpell(*itr, true, true, true, false);
+        else                                                // but send in normal spell in game learn case
+            LearnSpell(*itr, true);
+    }
 }

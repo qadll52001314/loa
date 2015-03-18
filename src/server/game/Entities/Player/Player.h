@@ -52,6 +52,7 @@ class PlayerMenu;
 class PlayerSocial;
 class SpellCastTargets;
 class UpdateMask;
+class CapitalCity;
 
 struct CharacterCustomizeInfo;
 
@@ -2392,6 +2393,12 @@ class Player : public Unit, public GridObject<Player>
     public:
         uint32 GetCapitalCityLevel();
 
+        /*********************************************************/
+        /***                  CAPITAL CITY                     ***/
+        /*********************************************************/
+    public:
+        void LearnCapitalCitySpells();
+        CapitalCity* GetCapitalCity();
     protected:
         // Gamemaster whisper whitelist
         GuidList WhisperList;

@@ -36,6 +36,7 @@ class Quest;
 class Player;
 class SpellInfo;
 class WorldSession;
+class CapitalCity;
 
 enum CreatureFlagsExtra
 {
@@ -525,7 +526,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         uint8 GetCurrentEquipmentId() { return m_equipmentId; }
         void SetCurrentEquipmentId(uint8 id) { m_equipmentId = id; }
 
-        float GetSpellDamageMod(int32 Rank) const;
+        float GetSpellDamageMod(int32 Rank, int32 Exp) const;
 
         VendorItemData const* GetVendorItems() const;
         uint32 GetVendorItemCurrentCount(VendorItem const* vItem);
@@ -670,7 +671,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         uint32 GetOriginalEntry() const { return m_originalEntry; }
         void SetOriginalEntry(uint32 entry) { m_originalEntry = entry; }
 
-        static float _GetDamageMod(int32 Rank);
+        static float _GetDamageMod(int32 Rank, int32 Exp);
 
         float m_SightDistance, m_CombatDistance;
 
@@ -692,7 +693,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         // vendor items
         VendorItemCounts m_vendorItemCounts;
 
-        static float _GetHealthMod(int32 Rank);
+        static float _GetHealthMod(int32 Rank, int32 Exp);
 
         ObjectGuid m_lootRecipient;
         uint32 m_lootRecipientGroup;
