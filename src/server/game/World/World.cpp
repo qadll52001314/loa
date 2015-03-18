@@ -1804,6 +1804,7 @@ void World::SetInitialWorldSettings()
     m_timers[WUPDATE_PINGDB].SetInterval(getIntConfig(CONFIG_DB_PING_INTERVAL)*MINUTE*IN_MILLISECONDS);    // Mysql ping time in minutes
 
     m_timers[WUPDATE_CAPITALCITY].SetInterval(3*IN_MILLISECONDS);
+    m_timers[WUPDATE_CC_RESEARCH].GetInterval(IN_MILLISECONDS*MINUTE);
 
     //to set mailtimer to return mails every day between 4 and 5 am
     //mailtimer is increased when updating auctions
@@ -2192,6 +2193,12 @@ void World::Update(uint32 diff)
     {
         m_timers[WUPDATE_CAPITALCITY].Reset();
         xCapitalCityMgr->Update();
+    }
+
+    if (m_timers[WUPDATE_CC_RESEARCH].Passed())
+    {
+        m_timers[WUPDATE_CC_RESEARCH].Reset();
+        xCapitalCityMgr->ResearchUpdate();
     }
 
     // update the instance reset times

@@ -33,7 +33,7 @@ struct CapitalCityNpcResearchState
     uint32 spellSet;
     uint32 rank;
     uint8 state;
-    uint8 progress;
+    uint32 progress;
     uint32 itemCount1;
     uint32 itemCount2;
     uint32 itemCount3;
@@ -62,6 +62,7 @@ struct CapitalCityResearchSpell
     uint32 reqItemCount2;
     uint32 reqItemCount3;
     uint32 reqItemCount4;
+    uint32 progress;
 };
 
 struct CapitalCityResearchState
@@ -72,21 +73,21 @@ struct CapitalCityResearchState
 
 typedef std::map<uint32, CapitalCity*> CapitalCityMap;
 typedef std::map<uint32, CapitalCityUpgradeCost> CapitalCityUpgradeCostMap;
-typedef std::multimap<uint32, CapitalCityResearchSpell> CapitalCityResearchSpellSet;
-typedef std::multimap<uint32, CapitalCityNpcResearchState> CapitalCityResearchStateSet;
-typedef std::multimap<uint32, uint32> CapitalCityResearcherSpellSet;
-typedef std::multimap<uint32, uint32> CapitalCityLearnableSpellSet;
-typedef std::map<uint32, const CapitalCityResearchSpell*> CapitalCityResearchSpellSet;
-typedef std::map<uint32, std::string> CapitalCitySpellSet;
+typedef std::multimap<uint32, CapitalCityResearchSpell> CapitalCityResearchSpellMap;
+typedef std::map<uint32, const CapitalCityResearchSpell*> PCapitalCityResearchSpellMap;
+typedef std::multimap<uint32, CapitalCityNpcResearchState> CapitalCityResearchStateMap;
+typedef std::multimap<uint32, uint32> CapitalCityResearcherSpellSetMap;
+typedef std::multimap<uint32, uint32> CapitalCityLearnableSpellSetMap;
+typedef std::map<uint32, std::string> CapitalCitySpellSetMap;
 typedef std::map<uint32, std::string> CapitalCitySpellSetContainer;
 typedef std::vector<const CapitalCityResearchSpell*> CapitalCityResearchSpellSetContainer;
-typedef std::vector<uint32> CapitalCitySpellResearchSetList;
-typedef std::pair<CapitalCityResearcherSpellSet::const_iterator, CapitalCityResearcherSpellSet::const_iterator> CapitalCityResearcherSpellSetConstBounds;
-typedef std::pair<CapitalCityResearchSpellSet::const_iterator, CapitalCityResearchSpellSet::const_iterator> CapitalCityResearchSpellConstBounds;
-typedef std::pair<CapitalCityResearchStateSet::const_iterator, CapitalCityResearchStateSet::const_iterator> CapitalCityResearchStateConstBounds;
-typedef std::pair<CapitalCityResearchStateSet::iterator, CapitalCityResearchStateSet::iterator> CapitalCityResearchStateBounds;
-typedef std::pair<CapitalCityLearnableSpellSet::const_iterator, CapitalCityLearnableSpellSet::const_iterator> CapitalCityLearnableSpellConstBounds;
+typedef std::vector<uint32> CapitalCityResearchSpellSetList;
 
+typedef std::pair<CapitalCityResearcherSpellSetMap::const_iterator, CapitalCityResearcherSpellSetMap::const_iterator> CapitalCityResearcherSpellSetConstBounds;
+typedef std::pair<CapitalCityResearchSpellMap::const_iterator, CapitalCityResearchSpellMap::const_iterator> CapitalCityResearchSpellConstBounds;
+typedef std::pair<CapitalCityResearchStateMap::const_iterator, CapitalCityResearchStateMap::const_iterator> CapitalCityResearchStateConstBounds;
+typedef std::pair<CapitalCityResearchStateMap::iterator, CapitalCityResearchStateMap::iterator> CapitalCityResearchStateBounds;
+typedef std::pair<CapitalCityLearnableSpellSetMap::const_iterator, CapitalCityLearnableSpellSetMap::const_iterator> CapitalCityLearnableSpellConstBounds;
 
 typedef std::vector<CapitalCity*> CapitalCityList;
 typedef std::vector<uint32> CapitalCitySpellList;
@@ -116,18 +117,19 @@ public:
     }
 
     void Update();
+    void ResearchUpdate();
     void LoadCapitalCities();
     CapitalCity* GetCapitalCityByZone(uint32 zone) const;
     CapitalCity* GetCapitalCityByID(uint32 id) const;
     void Save();
 
-    void SendStateTo(Player*, uint32 index, uint32 value);
-    void ClearStateOf(Player*, uint32 index);
+    void SendStateTo(Player*, uint32 index, uint32 value) const;
+    void ClearStateOf(Player*, uint32 index) const;
 
     void HandlePlayerEnter(Player*, uint32 zone);
     void HandlePlayerLeave(Player*, uint32 zone);
 
-    bool ReachedRequiredRank(Creature* creature, uint32 rank);
+    bool ReachedRequiredRank(Creature* creature, uint32 rank) const;
     CapitalCity* FactionBelongsTo(uint32 faction) const;
 
     uint32 ResourceToNextLevel(uint32 nextLevel) const;
@@ -135,46 +137,40 @@ public:
     uint32 StartResourceToNextLevel(uint32 nextLevel) const;
     uint32 StartMagicPowerToNextLevel(uint32 nextLevel) const;
 
-    CapitalCityResearchSpellSetContainer GetResearchAvailable(Creature* researcher);
-    CapitalCityResearchSpellSetContainer GetResearchInProgress(Creature* researcher);
-    CapitalCityResearchSpellSetContainer GetResearchCompleted(Creature* researcher);
-    const CapitalCityResearchSpell* GetNextAvailableResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet);
-    const CapitalCityResearchSpell* GetInProgressResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet);
-    const CapitalCityResearchSpell* GetCompletedResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet);
+    CapitalCityResearchSpellSetContainer GetAvailableResearch(Creature* researcher) const;
+    CapitalCityResearchSpellSetContainer GetInProgressResearch(Creature* researcher) const;
+    CapitalCityResearchSpellSetContainer GetResearchCompleted(Creature* researcher) const;
+    const CapitalCityResearchSpell* GetNextAvailableResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const;
+    const CapitalCityResearchSpell* GetInProgressResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const;
+    const CapitalCityResearchSpell* GetCompletedResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const;
     const CapitalCityResearchSpell* GetCapitalCityResearchSpell(uint32 spellSet, uint32 rank) const;
 
-    CapitalCitySpellResearchSetList GetResearchListForCreatureEntry(uint32 entry);
+    CapitalCityResearchSpellSetList GetResearchListForCreatureEntry(uint32 entry) const;
     uint32 GetResearchSpellRank(uint32 spellSet, uint32 spell) const;
-    const CapitalCityResearchSpell* GetResearchSpell(uint32 spellSet, uint32 rank);
-    CapitalCityResearchSpellSet GetSpellSet(uint32 spellset);
-    CapitalCityResearchState GetResearchState(uint32 entry, uint32 spellSet);
+    const CapitalCityResearchSpell* GetResearchSpell(uint32 spellSet, uint32 rank) const;
+    PCapitalCityResearchSpellMap GetSpellSet(uint32 spellset) const;
+    CapitalCityResearchState GetResearchState(uint32 entry, uint32 spellSet) const;
     void UpdateResearchState(uint32 entry, uint32 spellSet, uint32 rank, uint8 state);
-
-    bool CanCreatureResearch(uint32 creatureEntry, uint32 spellSet);
-
-    CapitalCityList GetCapitalCitiesForTeam(uint32 team);
-    CapitalCitySpellList GetLearnableSpellsForTeam(uint32 team);
-
-    CapitalCitySpellList GetSpellsForRank(uint32 cityID, uint32 rank);
-
-    void SendResearchProgress(Player* receiver, uint32 researcher, uint32 spellSet);
-    const CapitalCityNpcResearchState* GetNpcResearchState(uint32 researcher, uint32 spellSet);
-
-    uint32 GetResearchDescriptionText(uint32 spellSet, uint32 spell);
-
-    std::string GetSpellSetName(uint32 spellSet);
-
-    bool HaveAllReagentForNextResearch(uint32 researcherEntry, uint32 spellSet);
-
+    bool CanCreatureResearch(uint32 creatureEntry, uint32 spellSet) const;
+    CapitalCityList GetCapitalCitiesForTeam(uint32 team) const;
+    CapitalCitySpellList GetLearnableSpellsForTeam(uint32 team) const;
+    CapitalCitySpellList GetSpellsForRank(uint32 cityID, uint32 rank) const;
+    void SendResearchProgress(Player* receiver, uint32 researcher, uint32 spellSet) const;
+    const CapitalCityNpcResearchState* GetNpcResearchState(uint32 researcher, uint32 spellSet) const;
+    uint32 GetResearchDescriptionText(uint32 spellSet, uint32 spell) const;
+    std::string GetSpellSetName(uint32 spellSet) const;
+    bool HaveAllReagentForNextResearch(uint32 researcherEntry, uint32 spellSet) const;
     void StartNextAvailableResearch(uint32 researcherEntry, uint32 spellSet);
+    void AddReagentTo(uint32 researcherEntry, uint32 spellSet, uint32 item, uint32 count);
+    CapitalCityNpcResearchState BuildNewResearchState(const CapitalCityResearchSpell* spell, uint32 spellSet, uint32 item, uint32 count) const;
 private:
     CapitalCityMap m_CapitalCities;
     CapitalCityUpgradeCostMap m_UpgradeCosts;
-    CapitalCityResearchSpellSet m_ResearchSpellSet;
-    CapitalCityResearchStateSet m_ResearchStateSet;
-    CapitalCityResearcherSpellSet m_ResearcherSpellSet;
-    CapitalCityLearnableSpellSet m_LearnableSpellSet;
-    CapitalCitySpellSet m_SpellSet;
+    CapitalCityResearchSpellMap m_ResearchSpellMap;
+    CapitalCityResearchStateMap m_ResearchStateMap;
+    CapitalCityResearcherSpellSetMap m_ResearcherSpellSetMap;
+    CapitalCityLearnableSpellSetMap m_LearnableSpellSetMap;
+    CapitalCitySpellSetMap m_SpellSetMap;
 };
 
 #define xCapitalCityMgr CapitalCityMgr::instance()

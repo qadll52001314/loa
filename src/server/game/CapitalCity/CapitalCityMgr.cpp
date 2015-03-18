@@ -98,7 +98,7 @@ void CapitalCityMgr::LoadCapitalCities()
 
     m_ResearchSpellSet.clear();
 
-    result = WorldDatabase.Query("SELECT SpellSet, Rank, Spell, Description, ReqCityRank, ReqItem1, ReqItem2, ReqItem3, ReqItem4, ReqItemCount1, ReqItemCount2, ReqItemCount3, ReqItemCount4 FROM capital_city_upgrade_spells");
+    result = WorldDatabase.Query("SELECT SpellSet, Rank, Spell, Description, ReqCityRank, ReqItem1, ReqItem2, ReqItem3, ReqItem4, ReqItemCount1, ReqItemCount2, ReqItemCount3, ReqItemCount4, Progress FROM capital_city_upgrade_spells");
 
     count = 0;
 
@@ -120,6 +120,7 @@ void CapitalCityMgr::LoadCapitalCities()
             spell.reqItemCount2 = fields[10].GetUInt32();
             spell.reqItemCount3 = fields[11].GetUInt32();
             spell.reqItemCount4 = fields[12].GetUInt32();
+            spell.progress = fields[13].GetUInt32();
             m_ResearchSpellSet.insert(std::pair<uint32, CapitalCityResearchSpell>(fields[0].GetUInt32(), spell));
             ++count;
         } while (result->NextRow());
@@ -201,12 +202,12 @@ void CapitalCityMgr::Save()
     }
 }
 
-void CapitalCityMgr::SendStateTo(Player* player, uint32 index, uint32 value)
+void CapitalCityMgr::SendStateTo(Player* player, uint32 index, uint32 value) const
 {
     player->SendUpdateWorldState(index, value);
 }
 
-void CapitalCityMgr::ClearStateOf(Player* player, uint32 index)
+void CapitalCityMgr::ClearStateOf(Player* player, uint32 index) const
 {
     player->SendUpdateWorldState(index, 0);
 }
@@ -241,7 +242,7 @@ CapitalCity* CapitalCityMgr::GetCapitalCityByID(uint32 id) const
     return itr->second;
 }
 
-bool CapitalCityMgr::ReachedRequiredRank(Creature* creature, uint32 rank)
+bool CapitalCityMgr::ReachedRequiredRank(Creature* creature, uint32 rank) const
 {
     if (rank == 0)
         return true;
@@ -325,7 +326,7 @@ uint32 CapitalCityMgr::StartMagicPowerToNextLevel(uint32 nextLevel) const
     return itr->second.startMagicPower;
 }
 
-CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchAvailable(Creature* researcher)
+CapitalCityResearchSpellSetContainer CapitalCityMgr::GetAvailableResearch(Creature* researcher) const
 {
     CapitalCityResearchSpellSetContainer container;
 
@@ -334,9 +335,9 @@ CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchAvailable(Creatu
     if (!city)
         return container;
 
-    uint32 entry = researcher->GetCreatureTemplate()->Entry;
+    uint32 entry = researcher->GetEntry();
 
-    CapitalCitySpellResearchSetList list = GetResearchListForCreatureEntry(entry);
+    CapitalCityResearchSpellSetList list = GetResearchListForCreatureEntry(entry);
     if (list.empty())
         return container;
 
@@ -350,7 +351,7 @@ CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchAvailable(Creatu
     return container;
 }
 
-CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchInProgress(Creature* researcher)
+CapitalCityResearchSpellSetContainer CapitalCityMgr::GetInProgressResearch(Creature* researcher) const
 {
     CapitalCityResearchSpellSetContainer container;
 
@@ -361,7 +362,7 @@ CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchInProgress(Creat
 
     uint32 entry = researcher->GetCreatureTemplate()->Entry;
 
-    CapitalCitySpellResearchSetList list = GetResearchListForCreatureEntry(entry);
+    CapitalCityResearchSpellSetList list = GetResearchListForCreatureEntry(entry);
     if (list.empty())
         return container;
 
@@ -375,14 +376,14 @@ CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchInProgress(Creat
     return container;
 }
 
-CapitalCitySpellResearchSetList CapitalCityMgr::GetResearchListForCreatureEntry(uint32 entry)
+CapitalCityResearchSpellSetList CapitalCityMgr::GetResearchListForCreatureEntry(uint32 entry) const
 {
-    CapitalCitySpellResearchSetList list;
+    CapitalCityResearchSpellSetList list;
     CapitalCityResearcherSpellSetConstBounds bound = m_ResearcherSpellSet.equal_range(entry);
     if (bound.first == bound.second)
         return list;
 
-    for (CapitalCityResearcherSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearcherSpellSetMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
         list.push_back(itr->second);
 
     return list;
@@ -394,7 +395,7 @@ uint32 CapitalCityMgr::GetResearchSpellRank(uint32 spellSet, uint32 spell) const
     if (bound.first == bound.second)
         return 0;
 
-    for (CapitalCityResearchSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearchSpellMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
     {
         if (itr->second.spell == spell)
             return itr->second.rank;
@@ -403,20 +404,20 @@ uint32 CapitalCityMgr::GetResearchSpellRank(uint32 spellSet, uint32 spell) const
     return 0;
 }
 
-CapitalCityResearchSpellSet CapitalCityMgr::GetSpellSet(uint32 spellset)
+PCapitalCityResearchSpellMap CapitalCityMgr::GetSpellSet(uint32 spellset) const
 {
-    CapitalCityResearchSpellSet set;
+    PCapitalCityResearchSpellMap set;
     CapitalCityResearchSpellConstBounds bound = m_ResearchSpellSet.equal_range(spellset);
     if (bound.first == bound.second)
         return set;
 
-    for (CapitalCityResearchSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearchSpellMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
         set.insert(std::pair<uint32, const CapitalCityResearchSpell*>(itr->second.rank, &itr->second));
 
     return set;
 }
 
-const CapitalCityResearchSpell* CapitalCityMgr::GetNextAvailableResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet)
+const CapitalCityResearchSpell* CapitalCityMgr::GetNextAvailableResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const
 {
     if (!CanCreatureResearch(creatureEntry, spellSet))
         return NULL;
@@ -434,7 +435,7 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetNextAvailableResearchSpellFor
     return NULL;
 }
 
-const CapitalCityResearchSpell* CapitalCityMgr::GetInProgressResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet)
+const CapitalCityResearchSpell* CapitalCityMgr::GetInProgressResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const
 {
     if (!CanCreatureResearch(creatureEntry, spellSet))
         return NULL;
@@ -452,7 +453,7 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetInProgressResearchSpellForCre
     return NULL;
 }
 
-const CapitalCityResearchSpell* CapitalCityMgr::GetCompletedResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet)
+const CapitalCityResearchSpell* CapitalCityMgr::GetCompletedResearchSpellForCreature(uint32 creatureEntry, uint32 spellSet) const
 {
     if (!CanCreatureResearch(creatureEntry, spellSet))
         return NULL;
@@ -470,42 +471,49 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetCompletedResearchSpellForCrea
     return NULL;
 }
 
-CapitalCityResearchState CapitalCityMgr::GetResearchState(uint32 entry, uint32 spellSet)
+CapitalCityResearchState CapitalCityMgr::GetResearchState(uint32 entry, uint32 spellSet) const
 {
     CapitalCityResearchState state;
-    CapitalCityResearchStateConstBounds bound = m_ResearchStateSet.equal_range(entry);
+    state.spell = NULL;
+    state.state = CC_RESEARCH_STATE_NOT_STARTED;
+    CapitalCityResearcherSpellSetConstBounds bound = m_ResearcherSpellSet.equal_range(entry);
     if (bound.first == bound.second)
         return state;
 
-    for (CapitalCityResearchStateSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    CapitalCityResearchStateConstBounds stateBound = m_ResearchStateSet.equal_range(entry);
+    if (stateBound.first == stateBound.second)
     {
-        if (itr->second.spellSet == spellSet)
+        // not started
+        state.spell = GetResearchSpell(spellSet, 1);
+    }
+    else
+    {
+        for (CapitalCityResearchStateMap::const_iterator itr = stateBound.first; itr != stateBound.second; ++itr)
         {
-            const CapitalCityResearchSpell* sp = GetResearchSpell(spellSet, itr->second.rank);
-            if (!sp)
-                return state;
-            state.spell = sp;
-            state.state = itr->second.state;
-            return state;
+            if (itr->second.spellSet == spellSet)
+            {
+                state.state = itr->second.state;
+                state.spell = GetResearchSpell(spellSet, itr->second.rank);
+            }
         }
     }
 
     return state;
 }
 
-bool CapitalCityMgr::CanCreatureResearch(uint32 creatureEntry, uint32 spellSet)
+bool CapitalCityMgr::CanCreatureResearch(uint32 creatureEntry, uint32 spellSet) const
 {
-    CapitalCitySpellResearchSetList list = GetResearchListForCreatureEntry(creatureEntry);
+    CapitalCityResearchSpellSetList list = GetResearchListForCreatureEntry(creatureEntry);
     if (list.empty())
         return false;
 
-    CapitalCitySpellResearchSetList::const_iterator itr = std::find(list.begin(), list.end(), spellSet);
+    CapitalCityResearchSpellSetList::const_iterator itr = std::find(list.begin(), list.end(), spellSet);
     if (itr != list.end())
         return true;
     return false;
 }
 
-CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchCompleted(Creature* researcher)
+CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchCompleted(Creature* researcher) const
 {
     CapitalCityResearchSpellSetContainer container;
 
@@ -516,7 +524,7 @@ CapitalCityResearchSpellSetContainer CapitalCityMgr::GetResearchCompleted(Creatu
 
     uint32 entry = researcher->GetCreatureTemplate()->Entry;
 
-    CapitalCitySpellResearchSetList list = GetResearchListForCreatureEntry(entry);
+    CapitalCityResearchSpellSetList list = GetResearchListForCreatureEntry(entry);
     if (list.empty())
         return container;
 
@@ -536,7 +544,7 @@ void CapitalCityMgr::UpdateResearchState(uint32 entry, uint32 spellSet, uint32 r
     if (bound.first == bound.second)
         return;
 
-    for (CapitalCityResearchStateSet::iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearchStateMap::iterator itr = bound.first; itr != bound.second; ++itr)
     {
         if (itr->second.spellSet == spellSet)
         {
@@ -567,13 +575,13 @@ void CapitalCityMgr::UpdateResearchState(uint32 entry, uint32 spellSet, uint32 r
     CharacterDatabase.Execute(stmt);
 }
 
-const CapitalCityResearchSpell* CapitalCityMgr::GetResearchSpell(uint32 spellSet, uint32 rank)
+const CapitalCityResearchSpell* CapitalCityMgr::GetResearchSpell(uint32 spellSet, uint32 rank) const
 {
     CapitalCityResearchSpellConstBounds bound = m_ResearchSpellSet.equal_range(spellSet);
     if (bound.first == bound.second)
         return NULL;
 
-    for (CapitalCityResearchSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearchSpellMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
     {
         if (itr->second.rank == rank)
             return &itr->second;
@@ -582,7 +590,7 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetResearchSpell(uint32 spellSet
     return NULL;
 }
 
-CapitalCityList CapitalCityMgr::GetCapitalCitiesForTeam(uint32 team)
+CapitalCityList CapitalCityMgr::GetCapitalCitiesForTeam(uint32 team) const
 {
     CapitalCityList v;
     for (CapitalCityMap::const_iterator itr = m_CapitalCities.begin(); itr != m_CapitalCities.end(); ++itr)
@@ -593,7 +601,7 @@ CapitalCityList CapitalCityMgr::GetCapitalCitiesForTeam(uint32 team)
     return v;
 }
 
-CapitalCitySpellList CapitalCityMgr::GetLearnableSpellsForTeam(uint32 team)
+CapitalCitySpellList CapitalCityMgr::GetLearnableSpellsForTeam(uint32 team) const
 {
     CapitalCitySpellList v;
 
@@ -607,15 +615,15 @@ CapitalCitySpellList CapitalCityMgr::GetLearnableSpellsForTeam(uint32 team)
         if (bound.first == bound.second)
             continue;
 
-        for (CapitalCityLearnableSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+        for (CapitalCityLearnableSpellSetMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
         {
-            CapitalCityResearchSpellSet spells = GetSpellSet(itr->second);
+            PCapitalCityResearchSpellMap spells = GetSpellSet(itr->second);
             if (!spells.empty())
             {
                 uint32 maxRank = 0;
                 uint32 maxSpell = 0;
 
-                for (CapitalCityResearchSpellSet::const_iterator itrSpell = spells.begin(); itrSpell != spells.end(); ++itrSpell)
+                for (PCapitalCityResearchSpellMap::const_iterator itrSpell = spells.begin(); itrSpell != spells.end(); ++itrSpell)
                 {
                     if (itrSpell->second->rank > maxRank && itrSpell->second->reqCityRank <= city->GetRank())
                     {
@@ -633,7 +641,7 @@ CapitalCitySpellList CapitalCityMgr::GetLearnableSpellsForTeam(uint32 team)
     return v;
 }
 
-CapitalCitySpellList CapitalCityMgr::GetSpellsForRank(uint32 cityID, uint32 rank)
+CapitalCitySpellList CapitalCityMgr::GetSpellsForRank(uint32 cityID, uint32 rank) const
 {
     CapitalCitySpellList list;
     CapitalCity* city = GetCapitalCityByID(cityID);
@@ -644,13 +652,13 @@ CapitalCitySpellList CapitalCityMgr::GetSpellsForRank(uint32 cityID, uint32 rank
     if (bound.first == bound.second)
         return list;
 
-    for (CapitalCityLearnableSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityLearnableSpellSetMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
     {
-        CapitalCityResearchSpellSet set = GetSpellSet(itr->second);
+        PCapitalCityResearchSpellMap set = GetSpellSet(itr->second);
         if (set.empty())
             continue;
 
-        for (CapitalCityResearchSpellSet::const_iterator itrSet = set.begin(); itrSet != set.end(); ++itrSet)
+        for (PCapitalCityResearchSpellMap::const_iterator itrSet = set.begin(); itrSet != set.end(); ++itrSet)
         {
             if (itrSet->second->reqCityRank == rank)
                 list.push_back(itrSet->second->spell);
@@ -660,22 +668,20 @@ CapitalCitySpellList CapitalCityMgr::GetSpellsForRank(uint32 cityID, uint32 rank
     return list;
 }
 
-void CapitalCityMgr::SendResearchProgress(Player* receiver, uint32 researcher, uint32 spellSet)
+void CapitalCityMgr::SendResearchProgress(Player* receiver, uint32 researcher, uint32 spellSet) const
 {
     const CapitalCityNpcResearchState* state = GetNpcResearchState(researcher, spellSet);
-    if (!state)
-        return;
 
-    const CapitalCityResearchSpell* spell = GetCapitalCityResearchSpell(spellSet, state->rank);
+    const CapitalCityResearchSpell* spell = GetCapitalCityResearchSpell(spellSet, state ? state->rank : 1);
     if (!spell)
         return;
 
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_PROGRESS, state->progress);
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_RANK, state->rank);
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_COUNT, state->itemCount1);
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_COUNT, state->itemCount2);
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_COUNT, state->itemCount3);
-    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_COUNT, state->itemCount4);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_PROGRESS, state ? state->progress * 100 / spell->progress : 0);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_RANK, state ? state->rank : 1);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_COUNT, state ? state->itemCount1 : 0);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_COUNT, state ? state->itemCount2 : 0);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_COUNT, state ? state->itemCount3 : 0);
+    receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_COUNT, state ? state->itemCount4 : 0);
     receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_MAX, spell->reqItemCount1);
     receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_MAX, spell->reqItemCount2);
     receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_MAX, spell->reqItemCount3);
@@ -683,13 +689,13 @@ void CapitalCityMgr::SendResearchProgress(Player* receiver, uint32 researcher, u
     receiver->SendUpdateWorldState(WORLDSTATE_RESEARCH_REQ_CITY_RANK, spell->reqCityRank);
 }
 
-uint32 CapitalCityMgr::GetResearchDescriptionText(uint32 spellSet, uint32 spell)
+uint32 CapitalCityMgr::GetResearchDescriptionText(uint32 spellSet, uint32 spell) const
 {
-    CapitalCityResearchSpellSet set = GetSpellSet(spellSet);
+    PCapitalCityResearchSpellMap set = GetSpellSet(spellSet);
     if (set.empty())
         return 0;
 
-    for (CapitalCityResearchSpellSet::const_iterator itr = set.begin(); itr != set.end(); ++itr)
+    for (PCapitalCityResearchSpellMap::const_iterator itr = set.begin(); itr != set.end(); ++itr)
     {
         if (itr->second->spell == spell)
             return itr->second->description;
@@ -698,12 +704,12 @@ uint32 CapitalCityMgr::GetResearchDescriptionText(uint32 spellSet, uint32 spell)
     return 0;
 }
 
-const CapitalCityNpcResearchState* CapitalCityMgr::GetNpcResearchState(uint32 researcher, uint32 spellSet)
+const CapitalCityNpcResearchState* CapitalCityMgr::GetNpcResearchState(uint32 researcher, uint32 spellSet) const
 {
     CapitalCityResearchStateConstBounds bound = m_ResearchStateSet.equal_range(researcher);
     if (bound.first != bound.second)
     {
-        for (CapitalCityResearchStateSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+        for (CapitalCityResearchStateMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
         {
             if (itr->second.spellSet == spellSet)
                 return &itr->second;
@@ -717,7 +723,7 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetCapitalCityResearchSpell(uint
     CapitalCityResearchSpellConstBounds bound = m_ResearchSpellSet.equal_range(spellSet);
     if (bound.first != bound.second)
     {
-        for (CapitalCityResearchSpellSet::const_iterator itr = bound.first; itr != bound.second; ++itr)
+        for (CapitalCityResearchSpellMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
         {
             if (itr->second.rank == rank)
                 return &itr->second;
@@ -726,15 +732,15 @@ const CapitalCityResearchSpell* CapitalCityMgr::GetCapitalCityResearchSpell(uint
     return NULL;
 }
 
-std::string CapitalCityMgr::GetSpellSetName(uint32 spellSet)
+std::string CapitalCityMgr::GetSpellSetName(uint32 spellSet) const
 {
-    CapitalCitySpellSet::const_iterator itr = m_SpellSet.find(spellSet);
+    CapitalCitySpellSetMap::const_iterator itr = m_SpellSet.find(spellSet);
     if (itr != m_SpellSet.end())
         return itr->second;
     return "";
 }
 
-bool CapitalCityMgr::HaveAllReagentForNextResearch(uint32 researcherEntry, uint32 spellSet)
+bool CapitalCityMgr::HaveAllReagentForNextResearch(uint32 researcherEntry, uint32 spellSet) const
 {
     const CapitalCityResearchSpell* spell = GetNextAvailableResearchSpellForCreature(researcherEntry, spellSet);
     if (!spell)
@@ -759,12 +765,92 @@ void CapitalCityMgr::StartNextAvailableResearch(uint32 researcherEntry, uint32 s
     if (bound.first == bound.second) // shouldnt happen
         return;
 
-    for (CapitalCityResearchStateSet::iterator itr = bound.first; itr != bound.second; ++itr)
+    for (CapitalCityResearchStateMap::iterator itr = bound.first; itr != bound.second; ++itr)
     {
         if (itr->second.spellSet == spellSet && itr->second.state == CC_RESEARCH_STATE_NOT_STARTED)
         {
-            UpdateResearchState(researcherEntry, spellSet, 0, CC_RESEARCH_STATE_IN_PROGRESS);
-            return; // or this invalidate the iterator
+            UpdateResearchState(researcherEntry, spellSet, /**/, CC_RESEARCH_STATE_IN_PROGRESS);
+            return;
         }
     }
+}
+
+void CapitalCityMgr::ResearchUpdate()
+{
+    // this method will be called every 1 minute, so just +1 to all research in progress.
+    for (CapitalCityResearchStateMap::iterator itr = m_ResearchStateSet.begin(); itr != m_ResearchStateSet.end(); ++itr)
+    {
+        if (itr->second.state == CC_RESEARCH_STATE_IN_PROGRESS)
+        {
+            itr->second.progress += 1;
+
+            const CapitalCityResearchSpell* spell = GetCapitalCityResearchSpell(itr->second.spellSet, itr->second.rank);
+
+            ASSERT(spell);
+
+            if (itr->second.progress >= spell->progress)
+                itr->second.state = CC_RESEARCH_STATE_FINISHED;
+        }
+    }
+}
+
+void CapitalCityMgr::AddReagentTo(uint32 researcherEntry, uint32 spellSet, uint32 item, uint32 count)
+{
+    const CapitalCityResearchSpell* spell = GetNextAvailableResearchSpellForCreature(researcherEntry, spellSet);
+    if (!spell)
+        return;
+
+    CapitalCityResearchStateBounds bound = m_ResearchStateSet.equal_range(researcherEntry);
+    if (bound.first == bound.second)
+    {
+        CapitalCityNpcResearchState state = BuildNewResearchState(spell, spellSet, item, count);
+        m_ResearchStateSet.insert(std::pair<uint32, CapitalCityNpcResearchState>(researcherEntry, state));
+    }
+    else
+    {
+        for (CapitalCityResearchStateMap::iterator itr = bound.first; itr != bound.second; ++itr)
+        {
+            if (itr->second.spellSet == spellSet)
+            {
+                if (spell->reqItem1 == item)
+                    itr->second.itemCount1 += count;
+                else if (spell->reqItem2 == item)
+                    itr->second.itemCount2 += count;
+                else if (spell->reqItem3 == item)
+                    itr->second.itemCount3 += count;
+                else if (spell->reqItem4 == item)
+                    itr->second.itemCount4 += count;
+                return;
+            }
+        }
+
+        CapitalCityNpcResearchState state = BuildNewResearchState(spell, spellSet, item, count);
+        m_ResearchStateSet.insert(std::pair<uint32, CapitalCityNpcResearchState>(researcherEntry, state));
+    }
+}
+
+CapitalCityNpcResearchState CapitalCityMgr::BuildNewResearchState(const CapitalCityResearchSpell* spell, uint32 spellSet, uint32 item, uint32 count) const
+{
+    ASSERT(spell);
+
+    CapitalCityNpcResearchState state;
+    state.itemCount1 = 0;
+    state.itemCount2 = 0;
+    state.itemCount3 = 0;
+    state.itemCount4 = 0;
+    state.progress = 0;
+    state.rank = 1;
+    state.spellSet = spellSet;
+    state.state = CC_RESEARCH_STATE_NOT_STARTED;
+
+    if (spell->reqItem1 == item)
+        state.itemCount1 += count;
+    else if (spell->reqItem2 == item)
+        state.itemCount2 += count;
+    else if (spell->reqItem3 == item)
+        state.itemCount3 += count;
+    else if (spell->reqItem4 == item)
+        state.itemCount4 += count;
+
+    return state;
 }
