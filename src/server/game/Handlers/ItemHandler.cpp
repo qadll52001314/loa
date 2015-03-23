@@ -27,6 +27,7 @@
 #include "UpdateData.h"
 #include "ObjectAccessor.h"
 #include "SpellInfo.h"
+#include "CapitalCityMgr.h"
 
 void WorldSession::HandleSplitItemOpcode(WorldPacket& recvData)
 {
@@ -748,8 +749,9 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
     if (vendor->HasUnitState(UNIT_STATE_MOVING))
         vendor->StopMoving();
 
-    VendorItemData const* items = vendor->GetVendorItems();
-    if (!items)
+    CapitalCityVendorItemContainer container = xCapitalCityMgr->GetVendorItems(vendor);
+
+    if (container.empty())
     {
         WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + 1);
         data << uint64(vendorGuid);
@@ -759,7 +761,7 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
         return;
     }
 
-    uint8 itemCount = items->GetItemCount();
+    uint8 itemCount = container.size();
     uint8 count = 0;
 
     WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + itemCount * 8 * 4);
@@ -770,9 +772,10 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
 
     float discountMod = _player->GetPriceDiscount(vendor);
 
-    for (uint8 slot = 0; slot < itemCount; ++slot)
+    uint8 slot = 0;
+    for (CapitalCityVendorItemContainer::const_iterator itr = container.begin(); itr != container.end(); ++itr)
     {
-        if (VendorItem const* item = items->GetItem(slot))
+        if (VendorItem const* item = itr->second)
         {
             if (ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(item->item))
             {
@@ -809,6 +812,8 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid)
                 data << uint32(itemTemplate->MaxDurability);
                 data << uint32(itemTemplate->BuyCount);
                 data << uint32(item->ExtendedCost);
+
+                ++slot;
 
                 if (++count >= MAX_VENDOR_ITEMS)
                     break;

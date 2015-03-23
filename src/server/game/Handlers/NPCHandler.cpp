@@ -141,32 +141,33 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
     if (GetPlayer()->HasUnitState(UNIT_STATE_DIED))
         GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
+    CapitalCityTrainerSpellContainer researchSpells = xCapitalCityMgr->GetTrainableSpells(unit);
     TrainerSpellData const* trainer_spells = unit->GetTrainerSpells();
-    if (!trainer_spells)
+    if (researchSpells.empty())
     {
         TC_LOG_DEBUG("network", "WORLD: SendTrainerList - Training spells not found for %s", guid.ToString().c_str());
         return;
     }
 
-    WorldPacket data(SMSG_TRAINER_LIST, 8+4+4+trainer_spells->spellList.size()*38 + strTitle.size()+1);
+    WorldPacket data(SMSG_TRAINER_LIST, 8+4+4+researchSpells.size()*38 + strTitle.size()+1);
     data << guid;
-    data << uint32(trainer_spells->trainerType);
+    data << uint32(trainer_spells ? trainer_spells->trainerType : 2);
 
     size_t count_pos = data.wpos();
-    data << uint32(trainer_spells->spellList.size());
+    data << uint32(researchSpells.size());
 
     // reputation discount
     float fDiscountMod = _player->GetPriceDiscount(unit);
     bool can_learn_primary_prof = GetPlayer()->GetFreePrimaryProfessionPoints() > 0;
 
     uint32 count = 0;
-    for (TrainerSpellMap::const_iterator itr = trainer_spells->spellList.begin(); itr != trainer_spells->spellList.end(); ++itr)
+    for (CapitalCityTrainerSpellContainer::const_iterator itr = researchSpells.begin(); itr != researchSpells.end(); ++itr)
     {
-        TrainerSpell const* tSpell = &itr->second;
+        TrainerSpell const* tSpell = itr->second;
 
         if (tSpell->reqCityRank != 0)
         {
-            if (!xCapitalCityMgr->ReachedRequiredRank(unit, tSpell->reqCityRank) && !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM))
+            if (!xCapitalCityMgr->ReachedRequiredCityRank(unit, tSpell->reqCityRank) && !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM))
                 continue;
         }
 
@@ -195,7 +196,7 @@ void WorldSession::SendTrainerList(ObjectGuid guid, const std::string& strTitle)
         data << uint32(floor(tSpell->spellCost * fDiscountMod));
 
         data << uint32(primary_prof_first_rank && can_learn_primary_prof ? 1 : 0);
-                                                            // primary prof. learn confirmation dialog
+        // primary prof. learn confirmation dialog
         data << uint32(primary_prof_first_rank ? 1 : 0);    // must be equal prev. field to have learn button in enabled state
         data << uint8(tSpell->reqLevel);
         data << uint32(tSpell->reqSkill);
@@ -257,21 +258,22 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recvData)
         GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
     // check present spell in trainer spell list
-    TrainerSpellData const* trainer_spells = unit->GetTrainerSpells();
-    if (!trainer_spells)
+    CapitalCityTrainerSpellContainer researchSpells = xCapitalCityMgr->GetTrainableSpells(unit);
+    if (researchSpells.empty())
         return;
 
     // not found, cheat?
-    TrainerSpell const* trainer_spell = trainer_spells->Find(spellId);
-    if (!trainer_spell)
+    CapitalCityTrainerSpellContainer::const_iterator itr = researchSpells.find(spellId);
+    TrainerSpell const* tSpell = itr->second;
+    if (!tSpell)
         return;
 
     // can't be learn, cheat? Or double learn with lags...
-    if (_player->GetTrainerSpellState(trainer_spell) != TRAINER_SPELL_GREEN)
+    if (_player->GetTrainerSpellState(tSpell) != TRAINER_SPELL_GREEN)
         return;
 
     // apply reputation discount
-    uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetPriceDiscount(unit)));
+    uint32 nSpellCost = uint32(floor(tSpell->spellCost * _player->GetPriceDiscount(unit)));
 
     // check money requirement
     if (!_player->HasEnoughMoney(nSpellCost))
@@ -283,8 +285,8 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recvData)
     unit->SendPlaySpellImpact(_player->GetGUID(), 362); // 113 EmoteSalute
 
     // learn explicitly or cast explicitly
-    if (trainer_spell->IsCastable())
-        _player->CastSpell(_player, trainer_spell->spell, true);
+    if (tSpell->IsCastable())
+        _player->CastSpell(_player, tSpell->spell, true);
     else
         _player->LearnSpell(spellId, false);
 

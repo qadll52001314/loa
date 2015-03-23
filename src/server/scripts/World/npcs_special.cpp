@@ -2379,6 +2379,8 @@ public:
     }
 };
 
+// obsolete
+/*
 enum CCGeneralGossips
 {
     CC_GOSSIP_MENU_UPGRADE = 55032,
@@ -2469,7 +2471,7 @@ public:
         switch (action)
         {
             case CC_GOSSIP_ACTION_UPGRADE_START:
-                city->UpgradeStart(player);
+                city->TryStartUpgrade(player);
                 player->CLOSE_GOSSIP_MENU();
                 break;
             case CC_GOSSIP_ACTION_UPGRADE_STOP:
@@ -2483,7 +2485,7 @@ public:
         return true;
     }
 };
-
+*/
 enum CapitalCityResearcherGossips
 {
     CC_GOSSIP_MENU_RESEARCH = 55042,
@@ -2527,15 +2529,31 @@ class capital_city_researcher : public CreatureScript
 public:
     capital_city_researcher() : CreatureScript("capital_city_researcher") { }
 
+    struct capital_city_researcherAI : public ScriptedAI
+    {
+        capital_city_researcherAI(Creature* creature) : ScriptedAI(creature) {}
+
+        void Reset() override 
+        {
+            me->AddAura(81557, me);
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new capital_city_researcherAI(creature);
+    }
+
     bool OnGossipHello(Player* player, Creature* creature) override
     {
         CapitalCity* city = creature->GetCapitalCity();
         if (!city)
             return false;
 
-        player->PrepareQuestMenu(creature->GetGUID());
-
         player->PlayerTalkClass->ClearMenus();
+
+        player->PrepareQuestMenu(creature->GetGUID());
+        //xCapitalCityMgr->PrepareResearchQuestMenu(player, creature);
 
         player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_TRAIN, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_TRAIN);
         player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_VENDOR, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_VENDOR);
@@ -2610,16 +2628,17 @@ public:
             player->PlayerTalkClass->ClearMenus();
             uint32 spellSet = action - CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START;
             CapitalCityResearchState state = xCapitalCityMgr->GetResearchState(creature->GetEntry(), spellSet);
-            if (!state.spell)
+            if (!state.data)
                 return false;
 
             xCapitalCityMgr->SendResearchProgress(player, creature->GetEntry(), spellSet);
             if (state.state == CC_RESEARCH_STATE_NOT_STARTED && xCapitalCityMgr->HaveAllReagentForNextResearch(creature->GetEntry(), spellSet))
                 player->ADD_GOSSIP_ITEM_DB(CC_GOSSIP_MENU_RESEARCH, CC_GOSSIP_ITEM_RESEARCH_START, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_START + spellSet);
-            player->SEND_GOSSIP_MENU(state.spell->description, creature->GetGUID());
+            player->SEND_GOSSIP_MENU(state.data->description, creature->GetGUID());
         }
         else
         {
+            player->PlayerTalkClass->ClearMenus();
             uint32 spellSet = action - CC_GOSSIP_ACTION_RESEARCH_START;
             xCapitalCityMgr->StartNextAvailableResearch(creature->GetEntry(), spellSet);
             player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_STARTED, creature->GetGUID());
@@ -2630,12 +2649,12 @@ public:
 
     void SendTrainingList(Player* player, Creature* creature)
     {
-
+        player->GetSession()->SendTrainerList(creature->GetGUID(), sObjectMgr->GetServerMessage(33));
     }
 
     void SendVendorList(Player* player, Creature* creature)
     {
-
+        player->GetSession()->SendListInventory(creature->GetGUID());
     }
 
     void SendInProgressResearchList(Player* player, Creature* creature)
@@ -2650,22 +2669,6 @@ public:
 
     void SendResearchList(Player* player, Creature* creature)
     {
-        player->PlayerTalkClass->ClearMenus();
-
-        CapitalCitySpellResearchSetList list = xCapitalCityMgr->GetResearchListForCreatureEntry(creature->GetEntry());
-        if (list.empty())
-        {
-            player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_NO_RESEARCH_AVAILABLE, creature->GetGUID());
-            return;
-        }
-
-        for (CapitalCitySpellResearchSetList::const_iterator itr = list.begin(); itr != list.end(); ++itr)
-        {
-            std::string name = xCapitalCityMgr->GetSpellSetName(*itr);
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, name, GOSSIP_SENDER_MAIN, CC_GOSSIP_ACTION_RESEARCH_SPELLSET_START + (*itr));
-        }
-
-        player->SEND_GOSSIP_MENU(CC_GOSSIP_TEXT_RESEARCH_LIST, creature->GetGUID());
     }
 };
 
@@ -2691,6 +2694,6 @@ void AddSC_npcs_special()
     new npc_firework();
     new npc_spring_rabbit();
     new npc_imp_in_a_ball();
-    new capital_city_general();
+    //new capital_city_general();
     new capital_city_researcher();
 }

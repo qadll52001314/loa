@@ -37,6 +37,8 @@ struct CreatureTemplate;
 struct Mail;
 struct TrainerSpell;
 struct VendorItem;
+struct CapitalCityNpcResearchState;
+struct CapitalCityResearchData;
 
 class AchievementMgr;
 class ReputationMgr;
@@ -2399,6 +2401,11 @@ class Player : public Unit, public GridObject<Player>
     public:
         void LearnCapitalCitySpells();
         CapitalCity* GetCapitalCity();
+        void SendResearchList(Creature* creature);
+        void SendResearchDetail(Creature* creature, uint8 index);
+        void SendResearchProgressState(const CapitalCityNpcResearchState* state);
+        void SendFirstRankResearchState(const CapitalCityResearchData* data);
+        void StartResearch(Creature* researcher, uint8 index);
     protected:
         // Gamemaster whisper whitelist
         GuidList WhisperList;

@@ -72,6 +72,7 @@ enum CreatureFlagsExtra
 #define MAX_CREATURE_MODELS 4
 #define MAX_CREATURE_QUEST_ITEMS 6
 #define CREATURE_MAX_SPELLS 8
+#define MAX_CREATURE_RESEARCHSET 6
 
 // from `creature_template` table
 struct CreatureTemplate
@@ -138,6 +139,7 @@ struct CreatureTemplate
     uint32  flags_extra;
     uint32  ScriptID;
     uint32  WarSchool;
+    uint32  ResearchSet[MAX_CREATURE_RESEARCHSET];
     uint32  GetRandomValidModelId() const;
     uint32  GetFirstValidModelId() const;
 
@@ -334,6 +336,8 @@ struct VendorItem
 {
     VendorItem(uint32 _item, int32 _maxcount, uint32 _incrtime, uint32 _ExtendedCost, uint32 _ReqCityRank)
         : item(_item), maxcount(_maxcount), incrtime(_incrtime), ExtendedCost(_ExtendedCost), ReqCityRank(_ReqCityRank) { }
+
+    VendorItem() { }
 
     uint32 item;
     uint32 maxcount;                                        // 0 for infinity item amount
@@ -682,9 +686,11 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         void FocusTarget(Spell const* focusSpell, WorldObject const* target);
         void ReleaseFocus(Spell const* focusSpell);
 
-        CapitalCity* GetCapitalCity();
+        CapitalCity* GetCapitalCity() const;
         bool CanLoot();
         uint32 GetCapitalCityRank();
+        TrainerSpellMap GetResearchSpells();
+        bool IsResearcher() const;
 
     protected:
         bool CreateFromProto(uint32 guidlow, uint32 entry, CreatureData const* data = nullptr, uint32 vehId = 0);

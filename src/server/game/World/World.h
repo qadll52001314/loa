@@ -776,7 +776,7 @@ class World
         void ReloadRBAC();
 
         void SendGlobalNotificationToFaction(const char* message, uint32 faction);
-        void SendGlobalChatMessageToFaction(const char* message, uint32 faction);
+        void SendGlobalChatMessageToTeam(const char* message, uint32 faction);
         void UpdateWorldStateInZone(uint32 zone, uint32 index, uint64 value);
 
         void AddGlobalSpellsToTeam(uint32 spell, uint32 team);

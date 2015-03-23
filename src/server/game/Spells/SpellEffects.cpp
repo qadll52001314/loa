@@ -6197,11 +6197,20 @@ void Spell::EffectGrantCityResource(SpellEffIndex effIndex)
         return;
 
     int32 cityIndex = GetSpellInfo()->Effects[effIndex].MiscValue;
-    int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
-    if (!cityIndex || !value) return;
-
     CapitalCity* city = xCapitalCityMgr->GetCapitalCityByID(cityIndex);
-    if (!city) return;
+
+    if (!city)
+    {
+        if (Creature* creature = m_caster->ToCreature())
+        {
+            city = creature->GetCapitalCity();
+            if (!city)
+                return;
+        }
+    }
+
+    int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
+    if (!value) return;
 
     city->AddResource(value, unitTarget->ToPlayer());
 
@@ -6229,11 +6238,20 @@ void Spell::EffectGrantCityMagicPower(SpellEffIndex effIndex)
         return;
 
     int32 cityIndex = GetSpellInfo()->Effects[effIndex].MiscValue;
-    int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
-    if (!cityIndex || !value) return;
-
     CapitalCity* city = xCapitalCityMgr->GetCapitalCityByID(cityIndex);
-    if (!city) return;
+
+    if (!city)
+    {
+        if (Creature* creature = m_caster->ToCreature())
+        {
+            city = creature->GetCapitalCity();
+            if (!city)
+                return;
+        }
+    }
+
+    int32 value = GetSpellInfo()->Effects[effIndex].CalcValue();
+    if (!value) return;
 
     city->AddMagicPower(value, unitTarget->ToPlayer());
 

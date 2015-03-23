@@ -620,6 +620,6 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     PrepareStatement(CHAR_REP_SUPREMACY_STATS, "REPLACE INTO character_supremacy (guid, strength, agility, stamina, intellect, spirit) VALUES(?,?,?,?,?,?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_SEL_SUPREMACY_STATS, "SELECT strength, agility, stamina, intellect, spirit FROM character_supremacy WHERE guid = ?", CONNECTION_SYNCH);
 
-    PrepareStatement(CHAR_UPD_CAPITAL_CITY_RESEARCH_STATE, "REPLACE INTO capital_city_npc_research_state (Entry, SpellSet, Rank, State) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_UPD_CAPITAL_CITY_RESEARCH_STATE, "REPLACE INTO capital_city_research_state (Entry, ResearchSet, Rank, State, Progress, ItemCount1, ItemCount2, ItemCount3, ItemCount4) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
 
 }

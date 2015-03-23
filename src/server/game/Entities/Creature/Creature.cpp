@@ -1392,7 +1392,7 @@ bool Creature::hasQuest(uint32 quest_id) const
         if (itr->second == quest_id)
             return true;
     }
-    return false;
+    return xCapitalCityMgr->HaveResearchQuest(this, quest_id);
 }
 
 bool Creature::hasInvolvedQuest(uint32 quest_id) const
@@ -1403,7 +1403,8 @@ bool Creature::hasInvolvedQuest(uint32 quest_id) const
         if (itr->second == quest_id)
             return true;
     }
-    return false;
+    
+    return xCapitalCityMgr->HaveResearchQuest(this, quest_id);
 }
 
 void Creature::DeleteFromDB()
@@ -2810,7 +2811,7 @@ void Creature::StartPickPocketRefillTimer()
     _pickpocketLootRestore = time(NULL) + sWorld->getIntConfig(CONFIG_CREATURE_PICKPOCKET_REFILL);
 }
 
-CapitalCity* Creature::GetCapitalCity()
+CapitalCity* Creature::GetCapitalCity() const
 {
     return xCapitalCityMgr->FactionBelongsTo(GetFactionTemplateEntry()->faction);
 }
@@ -2830,4 +2831,15 @@ uint32 Creature::GetCapitalCityRank()
     if (CapitalCity* city = GetCapitalCity())
         return city->GetRank();
     return 0;
+}
+
+bool Creature::IsResearcher() const
+{
+    const CreatureTemplate* proto = GetCreatureTemplate();
+    for (int i = 0; i != MAX_CREATURE_RESEARCHSET; ++i)
+    {
+        if (proto->ResearchSet[i] != 0)
+            return true;
+    }
+    return false;
 }

@@ -14446,13 +14446,9 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                     break;
                 case GOSSIP_OPTION_VENDOR:
                 {
-                    VendorItemData const* vendorItems = creature->GetVendorItems();
-                    if (!vendorItems || vendorItems->Empty())
-                    {
-                        TC_LOG_ERROR("sql.sql", "Creature %s (Entry: %u GUID: %u DB GUID: %u) has UNIT_NPC_FLAG_VENDOR set but has an empty trading item list.", creature->GetName().c_str(), creature->GetEntry(), creature->GetGUIDLow(), creature->GetDBTableGUIDLow());
-                        canTalk = false;
-                    }
-                    break;
+                    CapitalCityVendorItemContainer container = xCapitalCityMgr->GetVendorItems(creature);
+                    if (container.empty())
+                        continue;
                 }
                 case GOSSIP_OPTION_LEARNDUALSPEC:
                     if (!(GetSpecsCount() == 1 && creature->isCanTrainingAndResetTalentsOf(this) && !(getLevel() < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))))
@@ -14510,6 +14506,10 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                     if (creature->GetCreatureTemplate()->WarSchool == 0)
                         canTalk = false;
                     break;
+                case GOSSIP_OPTION_VIEW_RESEARCH:
+                    if (!creature->IsResearcher() || !xCapitalCityMgr->HaveAvailableResearch(creature->GetEntry()))
+                        canTalk = false;
+                    break;
                 default:
                     TC_LOG_ERROR("sql.sql", "Creature entry %u has unknown gossip option %u for menu %u", creature->GetEntry(), itr->second.OptionType, itr->second.MenuId);
                     canTalk = false;
@@ -14542,23 +14542,6 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
 
             if (boxBroadcastText)
                 strBoxText = boxBroadcastText->GetText(locale, getGender());
-
-            //if (locale != DEFAULT_LOCALE)
-            //{
-            //    if (!optionBroadcastText)
-            //    {
-            //        /// Find localizations from database.
-            //        if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
-            //            ObjectMgr::GetLocaleString(gossipMenuLocale->OptionText, locale, strOptionText);
-            //    }
-
-            //    if (!boxBroadcastText)
-            //    {
-            //        /// Find localizations from database.
-            //        if (GossipMenuItemsLocale const* gossipMenuLocale = sObjectMgr->GetGossipMenuItemsLocale(MAKE_PAIR32(menuId, menuId)))
-            //            ObjectMgr::GetLocaleString(gossipMenuLocale->BoxText, locale, strBoxText);
-            //    }
-            //}
 
             menu->GetGossipMenu().AddMenuItem(itr->second.OptionIndex, itr->second.OptionIcon, strOptionText, 0, itr->second.OptionType, strBoxText, itr->second.BoxMoney, itr->second.BoxCoded, itr->second.SingleTimeCheck);
             menu->GetGossipMenu().AddGossipMenuItemData(itr->second.OptionIndex, itr->second.ActionMenuId, itr->second.ActionPoiId);
@@ -14626,7 +14609,7 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
     }
 
     GossipMenuItemData const* menuItemData = gossipMenu.GetItemData(gossipListId);
-    if (!menuItemData)
+    if (gossipOptionId == GOSSIP_OPTION_GOSSIP && !menuItemData)
         return;
 
     int32 cost = int32(item->BoxMoney);
@@ -14639,6 +14622,8 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
 
     if (item->SingleTimeCheck)
         CheckGossipOption(menuId, gossipListId);
+
+    Creature* creature = source->ToCreature();
 
     switch (gossipOptionId)
     {
@@ -14736,7 +14721,7 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
         }
         case GOSSIP_OPTION_WARSCHOOL_TRAINER:
         {
-            if (Creature* creature = source->ToCreature())
+            if (creature)
             {
                 if (creature->GetCreatureTemplate()->WarSchool != 0 &&
                     xWarSchoolMgr->ValidForClass(creature->GetCreatureTemplate()->WarSchool, getClassMask()) &&
@@ -14752,10 +14737,10 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
         }
         case GOSSIP_OPTION_JOIN_WARSCHOOL:
         {
-            if (Creature* creature = source->ToCreature())
+            if (creature)
             {
                 uint32 warSchool = creature->GetCreatureTemplate()->WarSchool;
-                if (warSchool != 0 && xWarSchoolMgr->IsWarSchoolValid(warSchool))
+                if (warSchool && xWarSchoolMgr->IsWarSchoolValid(warSchool))
                 {
                     creature->SendPlaySpellVisual(179); // 53 SpellCastDirected
                     creature->SendPlaySpellImpact(GetGUID(), 362); // 113 EmoteSalute
@@ -14763,6 +14748,24 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
                 }
             }
             PlayerTalkClass->SendCloseGossip();
+            break;
+        }
+        case GOSSIP_OPTION_VIEW_RESEARCH:
+        {
+            if (creature)
+                SendResearchList(creature);
+            break;
+        }
+        case GOSSIP_OPTION_VIEW_RESEARCH_DETAIL:
+        {
+            if (creature)
+                SendResearchDetail(creature, gossipListId);
+            break;
+        }
+        case GOSSIP_OPTION_RESEARCH_START:
+        {
+            if (creature)
+                StartResearch(creature, gossipListId);
             break;
         }
     }
@@ -14872,6 +14875,36 @@ void Player::PrepareQuestMenu(ObjectGuid guid)
             qm.AddMenuItem(quest_id, 4);
         else if (GetQuestStatus(quest_id) == QUEST_STATUS_NONE)
             qm.AddMenuItem(quest_id, 2);
+    }
+
+    if (creature)
+    {
+        CapitalCityResearchDataSetContainer container = xCapitalCityMgr->GetAvailableResearchSet(creature);
+        if (container.empty())
+            return;
+
+        for (CapitalCityResearchDataSetContainer::const_iterator itr = container.begin(); itr != container.end(); ++itr)
+        {
+            uint32 questSet = (*itr)->questSet;
+            CapitalCityResearchQuestList list = xCapitalCityMgr->GetQuestSet(questSet);
+            if (list.empty())
+                continue;
+            for (int i = 0; i != list.size(); ++i)
+            {
+                uint32 questID = list[i];
+                Quest const* quest = sObjectMgr->GetQuestTemplate(questID);
+                if (!quest || !CanTakeQuest(quest, true))
+                    continue;
+
+                QuestStatus status = GetQuestStatus(questID);
+                if (status == QUEST_STATUS_COMPLETE)
+                    qm.AddMenuItem(questID, 4);
+                else if (status == QUEST_STATUS_INCOMPLETE)
+                    qm.AddMenuItem(questID, 4);
+                else
+                    qm.AddMenuItem(questID, 2);
+            }
+        }
     }
 }
 
@@ -15382,8 +15415,14 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
     uint32 quest_id = quest->GetQuestId();
 
     for (uint8 i = 0; i < QUEST_ITEM_OBJECTIVES_COUNT; ++i)
+    {
         if (quest->RequiredItemId[i])
+        {
             DestroyItemCount(quest->RequiredItemId[i], quest->RequiredItemCount[i], true);
+            if (Creature* creature = questGiver->ToCreature())
+                xCapitalCityMgr->AddReagentTo(creature->GetEntry(), quest->RequiredItemId[i], quest->RequiredItemCount[i]);
+        }
+    }
 
     for (uint8 i = 0; i < QUEST_SOURCE_ITEM_IDS_COUNT; ++i)
     {
@@ -21826,26 +21865,37 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
         return false;
     }
 
+    CapitalCityVendorItemContainer container = xCapitalCityMgr->GetVendorItems(creature);
     VendorItemData const* vItems = creature->GetVendorItems();
-    if (!vItems || vItems->Empty())
+    if (container.empty())
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
         return false;
     }
 
-    if (vendorslot >= vItems->GetItemCount())
+    if (vendorslot >= container.size())
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
         return false;
     }
 
-    VendorItem const* crItem = vItems->GetItem(vendorslot);
+    CapitalCityVendorItemContainer::const_iterator itr = container.find(item);
+    if (itr == container.end())
+    {
+        SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
+        return false;
+    }
+
+    VendorItem const* crItem = itr->second;
     // store diff item (cheating)
     if (!crItem || crItem->item != item)
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
         return false;
     }
+
+    if (crItem->ReqCityRank > creature->GetCapitalCityRank())
+        return false;
 
     // check current item amount if it limited
     if (crItem->maxcount != 0)
@@ -21904,9 +21954,6 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
             return false;
         }
     }
-
-    if (crItem->ReqCityRank > creature->GetCapitalCityRank())
-        return false;
 
     uint32 price = 0;
     if (crItem->IsGoldRequired(pProto) && pProto->BuyPrice > 0) //Assume price cannot be negative (do not know why it is int32)
@@ -27310,56 +27357,145 @@ bool Player::InSameFaction(uint32 faction) const
     switch (getRace())
     {
         case RACE_BLOODELF:
-            if (faction == 911)
-                return true;
-            break;
+            return faction == 911;
         case RACE_DRAENEI:
-            if (faction == 930)
-                return true;
-            break;
+            return faction == 930;
         case RACE_DWARF:
         case RACE_GNOME:
-            if (faction == 47 || faction == 54)
-                return true;
-            break;
+            return (faction == 47 || faction == 54);
         case RACE_HUMAN:
-            if (faction == 72)
-                return true;
-            break;
+            return faction == 72;
         case RACE_NIGHTELF:
-            if (faction == 69)
-                return true;
-            break;
+            return faction == 69;
         case RACE_ORC:
         case RACE_TROLL:
-            if (faction == 76 || faction == 530)
-                return true;
-            break;
+            return (faction == 76 || faction == 530);
         case RACE_TAUREN:
-            if (faction == 81)
-                return true;
-            break;
+            return faction == 81;
         case RACE_UNDEAD_PLAYER:
-            if (faction == 68)
-                return true;
-            break;
+            return faction == 68;
         default:
             return false;
     }
-    return false;
 }
 
 void Player::LearnCapitalCitySpells()
 {
-    CapitalCitySpellList list = xCapitalCityMgr->GetLearnableSpellsForTeam(GetTeam());
+    CapitalCityResearchList list = xCapitalCityMgr->GetLearnableResearchSetForTeam(GetTeam());
     if (list.empty())
         return;
 
-    for (CapitalCitySpellList::const_iterator itr = list.begin(); itr != list.end(); ++itr)
+    for (CapitalCityResearchList::const_iterator itr = list.begin(); itr != list.end(); ++itr)
     {
         if (!IsInWorld())                                    // will send in INITIAL_SPELLS in list anyway at map add
             AddSpell(*itr, true, true, true, false);
         else                                                // but send in normal spell in game learn case
             LearnSpell(*itr, true);
     }
+}
+
+void Player::SendResearchList(Creature* creature)
+{
+    PlayerTalkClass->ClearMenus();
+
+    const CreatureTemplate* proto = creature->GetCreatureTemplate();
+
+    if (!proto) // shouldnt happen
+    {
+        PlayerTalkClass->SendCloseGossip();
+        return;
+    }
+
+    bool hasAvailableResearch = false;
+
+    for (uint8 i = 0; i != MAX_CREATURE_RESEARCHSET; ++i)
+    {
+        uint32 researchSet = proto->ResearchSet[i];
+        if (researchSet) // no need to check state
+        {
+            std::string name = xCapitalCityMgr->GetResearchSetName(researchSet);
+            PlayerTalkClass->GetGossipMenu().AddMenuItem(i, GOSSIP_ICON_INTERACT_1, name, 0, GOSSIP_OPTION_VIEW_RESEARCH_DETAIL, "", 0);
+            hasAvailableResearch = true;
+        }
+    }
+
+    if (hasAvailableResearch)
+    {
+        PlayerTalkClass->GetGossipMenu().SetMenuId(55069);
+        PlayerTalkClass->SendGossipMenu(31142, creature->GetGUID());
+    }
+    else
+    {
+        PlayerTalkClass->GetGossipMenu().SetMenuId(55068);
+        PlayerTalkClass->SendGossipMenu(31141, creature->GetGUID());
+    }
+}
+
+void Player::SendResearchDetail(Creature* creature, uint8 index)
+{
+    PlayerTalkClass->ClearMenus();
+    const CapitalCityResearchData* data = xCapitalCityMgr->GetResearchDataForCreature(creature, index);
+    if (!data)
+    {
+        PlayerTalkClass->SendCloseGossip();
+        return;
+    }
+
+    const CapitalCityNpcResearchState* state = xCapitalCityMgr->GetNpcResearchState(creature, index);
+    if (state)
+    {
+        SendResearchProgressState(state);
+        if (state->state == CC_RESEARCH_STATE_NOT_STARTED && xCapitalCityMgr->HaveAllReagentForNextResearch(creature, index))
+            PlayerTalkClass->GetGossipMenu().AddMenuItem(55070, 0, 1, index);
+    }
+    else
+        SendFirstRankResearchState(data);
+
+    PlayerTalkClass->SendGossipMenu(data->description, creature->GetGUID());
+}
+
+void Player::SendResearchProgressState(const CapitalCityNpcResearchState* state)
+{
+    if (!state)
+        return;
+
+    const CapitalCityResearchData* data = xCapitalCityMgr->GetCapitalCityResearchData(state->researchSet, state->rank);
+    if (!data)
+        return;
+
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_PROGRESS, state ? state->progress * 100 / data->progress : 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_RANK, state ? state->rank : 1);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_COUNT, state ? state->itemCount1 : 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_COUNT, state ? state->itemCount2 : 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_COUNT, state ? state->itemCount3 : 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_COUNT, state ? state->itemCount4 : 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_MAX, data->reqItemCount1);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_MAX, data->reqItemCount2);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_MAX, data->reqItemCount3);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_MAX, data->reqItemCount4);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_REQ_CITY_RANK, data->reqCityRank);
+}
+
+void Player::SendFirstRankResearchState(const CapitalCityResearchData* data)
+{
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_PROGRESS, 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_RANK, 1);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_COUNT, 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_COUNT, 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_COUNT, 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_COUNT, 0);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM1_MAX, data->reqItemCount1);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM2_MAX, data->reqItemCount2);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM3_MAX, data->reqItemCount3);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_ITEM4_MAX, data->reqItemCount4);
+    SendUpdateWorldState(WORLDSTATE_RESEARCH_REQ_CITY_RANK, data->reqCityRank);
+}
+
+void Player::StartResearch(Creature* researcher, uint8 index)
+{
+    const CapitalCityNpcResearchState* state = xCapitalCityMgr->GetNpcResearchState(researcher, index);
+    if (!state) // shouldnt happen as complete resource quest will create this state
+        return;
+    else if (state->state == CC_RESEARCH_STATE_NOT_STARTED)
+        xCapitalCityMgr->StartResearch(researcher, index, GetTeam());
 }

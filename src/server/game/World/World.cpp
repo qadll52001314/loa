@@ -1804,7 +1804,7 @@ void World::SetInitialWorldSettings()
     m_timers[WUPDATE_PINGDB].SetInterval(getIntConfig(CONFIG_DB_PING_INTERVAL)*MINUTE*IN_MILLISECONDS);    // Mysql ping time in minutes
 
     m_timers[WUPDATE_CAPITALCITY].SetInterval(3*IN_MILLISECONDS);
-    m_timers[WUPDATE_CC_RESEARCH].GetInterval(IN_MILLISECONDS*MINUTE);
+    m_timers[WUPDATE_CC_RESEARCH].SetInterval(IN_MILLISECONDS*MINUTE);
 
     //to set mailtimer to return mails every day between 4 and 5 am
     //mailtimer is increased when updating auctions
@@ -3294,18 +3294,18 @@ void World::ReloadRBAC()
             session->InvalidateRBACData();
 }
 
-void World::SendGlobalNotificationToFaction(const char* message, uint32 faction)
+void World::SendGlobalNotificationToFaction(const char* message, uint32 team)
 {
     WorldPacket data(SMSG_NOTIFICATION, (strlen(message) + 1));
     data << message;
-    sWorld->SendGlobalMessage(&data, NULL, faction);
+    sWorld->SendGlobalMessage(&data, NULL, team);
 }
 
-void World::SendGlobalChatMessageToFaction(const char* message, uint32 faction)
+void World::SendGlobalChatMessageToTeam(const char* message, uint32 team)
 {
     WorldPacket data;
     ChatHandler::BuildChatPacket(data, CHAT_MSG_SYSTEM, LANG_UNIVERSAL, NULL, NULL, message);
-    sWorld->SendGlobalMessage(&data, NULL, faction);
+    sWorld->SendGlobalMessage(&data, NULL, team);
 }
 
 void World::UpdateWorldStateInZone(uint32 zone, uint32 index, uint64 value)

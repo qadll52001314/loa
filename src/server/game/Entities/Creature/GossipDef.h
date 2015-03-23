@@ -27,7 +27,7 @@
 class WorldSession;
 
 #define GOSSIP_MAX_MENU_ITEMS               32
-#define DEFAULT_GOSSIP_MESSAGE              0
+#define DEFAULT_GOSSIP_MESSAGE              3
 
 enum Gossip_Option
 {
@@ -53,6 +53,9 @@ enum Gossip_Option
     GOSSIP_OPTION_OUTDOORPVP        = 19,                   //added by code (option for outdoor pvp creatures)
     GOSSIP_OPTION_WARSCHOOL_TRAINER = 20,
     GOSSIP_OPTION_JOIN_WARSCHOOL    = 21,
+    GOSSIP_OPTION_VIEW_RESEARCH     = 22,
+    GOSSIP_OPTION_VIEW_RESEARCH_DETAIL = 23,
+    GOSSIP_OPTION_RESEARCH_START    = 24,
     GOSSIP_OPTION_MAX
 };
 

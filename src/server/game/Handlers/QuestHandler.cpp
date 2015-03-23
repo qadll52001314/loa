@@ -31,6 +31,7 @@
 #include "Battleground.h"
 #include "ScriptMgr.h"
 #include "GameObjectAI.h"
+#include "CapitalCityMgr.h"
 
 void WorldSession::HandleQuestgiverStatusQueryOpcode(WorldPacket& recvData)
 {
@@ -485,7 +486,7 @@ void WorldSession::HandleQuestgiverCompleteQuest(WorldPacket& recvData)
         return;
 
     Object* object = ObjectAccessor::GetObjectByTypeMask(*_player, guid, TYPEMASK_UNIT | TYPEMASK_GAMEOBJECT);
-    if (!object || !object->hasInvolvedQuest(questId))
+    if (!object || (!object->hasInvolvedQuest(questId)))
         return;
 
     // some kind of WPE protection

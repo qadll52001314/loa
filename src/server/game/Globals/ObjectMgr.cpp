@@ -410,8 +410,8 @@ void ObjectMgr::LoadCreatureTemplates()
                                              "InhabitType, HoverHeight, HealthModifier, ManaModifier, ArmorModifier, DamageModifier, ExperienceModifier, RacialLeader, "
     //                                        70          71          72          73          74          75          76          77           78                    79           80
                                              "questItem1, questItem2, questItem3, questItem4, questItem5, questItem6, movementId, RegenHealth, mechanic_immune_mask, flags_extra, ScriptName, "
-    //                                        81
-                                             "WarSchool "
+    //                                        81         82            83            84            85            86            87
+                                             "WarSchool, ResearchSet1, ResearchSet2, ResearchSet3, ResearchSet4, ResearchSet5, ResearchSet6 "
                                              "FROM creature_template;");
 
     if (!result)
@@ -518,6 +518,9 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
     creatureTemplate.flags_extra        = fields[79].GetUInt32();
     creatureTemplate.ScriptID           = GetScriptId(fields[80].GetCString());
     creatureTemplate.WarSchool          = fields[81].GetUInt32();
+
+    for (uint8 i = 0; i < MAX_CREATURE_RESEARCHSET; ++i)
+        creatureTemplate.ResearchSet[i] = fields[82 + i].GetUInt32();
 }
 
 void ObjectMgr::LoadCreatureTemplateAddons()

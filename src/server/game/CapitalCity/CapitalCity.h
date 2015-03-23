@@ -40,7 +40,7 @@ public:
     void SetID(uint32 id) { m_ID = id; }
     uint32 GetID() { return m_ID; }
     std::string GetName();
-    void UpgradeStart(Player* commander = NULL);
+    void TryStartUpgrade(Player* commander = NULL);
     void UpgradeStop(Player* commander = NULL);
 
     void Save();
