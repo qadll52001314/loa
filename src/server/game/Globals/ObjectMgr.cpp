@@ -3899,6 +3899,8 @@ void ObjectMgr::BuildPlayerLevelInfo(uint8 race, uint8 _class, uint8 level, Play
     }
 }
 
+int32 const ReputationMgr::Reputation_Cap;
+
 void ObjectMgr::LoadQuests()
 {
     uint32 oldMSTime = getMSTime();
@@ -7856,6 +7858,8 @@ SkillRangeType GetSkillRangeType(SkillRaceClassInfoEntry const* rcEntry)
             return SKILL_RANGE_MONO;
         case SKILL_CATEGORY_LANGUAGES:
             return SKILL_RANGE_LANGUAGE;
+        case SKILL_CATEGORY_SPECIFICATION:
+            return SKILL_RANGE_RANK;
     }
 
     return SKILL_RANGE_LEVEL;
@@ -9114,4 +9118,66 @@ bool ObjectMgr::LoadServerMesssages()
 
     TC_LOG_INFO("server.loading", ">> Loaded " SZFMTD " server messages in %u ms", _serverMessageStore.size(), GetMSTimeDiffToNow(oldMSTime));
     return true;
+}
+
+void ObjectMgr::LoadSpecSkillDataMap()
+{
+    m_SpecSkillDataMap.clear();
+
+    QueryResult result = WorldDatabase.Query("SELECT Tier, ID, Skill, Spell1, Spell2, Spell3, Spell4, Name, Description FROM spec_skill_data");
+
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            SpecSkillData data;
+            data.id = fields[1].GetUInt32();
+            data.skill = fields[2].GetUInt32();
+            data.spell[0] = fields[3].GetUInt32();
+            data.spell[1] = fields[4].GetUInt32();
+            data.spell[2] = fields[5].GetUInt32();
+            data.spell[3] = fields[6].GetUInt32();
+            data.name = fields[7].GetString();
+            data.description = fields[8].GetUInt32();
+            m_SpecSkillDataMap.insert(std::pair<uint32, SpecSkillData>(fields[0].GetUInt32(), data));
+        } while (result->NextRow());
+    }
+
+    m_SpecSkillTierMap.clear();
+
+    result = WorldDatabase.Query("SELECT Tier, Name FROM spec_skill_tier");
+
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            m_SpecSkillTierMap[fields[0].GetUInt32()] = fields[1].GetString();
+        } while (result->NextRow());
+    }
+}
+
+const SpecSkillData* ObjectMgr::GetSpecSkillData(uint32 tier, uint32 id) const
+{
+    SpecSkillDataBounds bound = m_SpecSkillDataMap.equal_range(tier);
+    if (bound.first == bound.second)
+        return NULL;
+
+    for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    {
+        if (itr->second.id == id)
+            return &itr->second;
+    }
+    return NULL;
+}
+
+const SpecSkillData* ObjectMgr::GetSpecSkillData(uint32 skill) const
+{
+    for (SpecSkillDataMap::const_iterator itr = m_SpecSkillDataMap.begin(); itr != m_SpecSkillDataMap.end(); ++itr)
+    {
+        if (itr->second.skill == skill)
+            return &itr->second;
+    }
+    return NULL;
 }

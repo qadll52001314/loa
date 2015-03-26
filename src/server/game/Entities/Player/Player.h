@@ -2376,9 +2376,14 @@ class Player : public Unit, public GridObject<Player>
 
     public:
         void GiveSupremacyLevel();
+        float GetPrimaryStat() const;
+        float GetSecondaryStat() const;
+        bool CanLearnSpec(uint32 tier) const;
     private:
         uint32 m_SupremacyStats[MAX_STATS];
         uint32 m_SupremacyLevel;
+        uint8 m_PrimaryStat;
+        uint8 m_SecondaryStat;
 
         /*********************************************************/
         /***                  LEGACY ITEM                      ***/
@@ -2406,6 +2411,8 @@ class Player : public Unit, public GridObject<Player>
         void SendResearchProgressState(const CapitalCityNpcResearchState* state);
         void SendFirstRankResearchState(const CapitalCityResearchData* data);
         void StartResearch(Creature* researcher, uint8 index);
+
+
     protected:
         // Gamemaster whisper whitelist
         GuidList WhisperList;

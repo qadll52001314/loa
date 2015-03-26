@@ -643,6 +643,9 @@ void Player::UpdateAllCritPercentages()
 {
     float value = GetMeleeCritFromAgility();
 
+    if (HasSkill(SKILL_SPEC_TIER1_5))
+        value += 10.0f + 0.1f * GetSkillValue(SKILL_SPEC_TIER1_5);
+
     SetBaseModValue(CRIT_PERCENTAGE, PCT_MOD, value);
     SetBaseModValue(OFFHAND_CRIT_PERCENTAGE, PCT_MOD, value);
     SetBaseModValue(RANGED_CRIT_PERCENTAGE, PCT_MOD, value);
@@ -792,6 +795,9 @@ void Player::UpdateSpellCritChance(uint32 school)
     crit += GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_SPELL_CRIT_CHANCE_SCHOOL, 1<<school);
     // Increase crit from spell crit ratings
     crit += GetRatingBonusValue(CR_CRIT_SPELL);
+
+    if (HasSkill(SKILL_SPEC_TIER1_5))
+        crit += 10.0f + 0.1f * GetSkillValue(SKILL_SPEC_TIER1_5);
 
     // Store crit value
     SetFloatValue(PLAYER_SPELL_CRIT_PERCENTAGE1 + school, crit);

@@ -920,7 +920,8 @@ Player::Player(WorldSession* session): Unit(true)
         m_SupremacyStats[i] = 0;
 
     m_SupremacyLevel = 0;
-
+    m_PrimaryStat = 0;
+    m_SecondaryStat = 0;
     m_WarSchool = 0;
 }
 
@@ -3931,7 +3932,7 @@ bool Player::IsNeedCastPassiveSpellAtLearn(SpellInfo const* spellInfo) const
     // talent dependent passives activated at form apply have proper stance data
     ShapeshiftForm form = GetShapeshiftForm();
     bool need_cast = (!spellInfo->Stances || (form && (spellInfo->Stances & (1 << (form - 1)))) ||
-        (!form && (spellInfo->AttributesEx2 & SPELL_ATTR2_NOT_NEED_SHAPESHIFT)));
+        (!form && spellInfo->HasAttribute(SPELL_ATTR2_NOT_NEED_SHAPESHIFT)));
 
     //Check CasterAuraStates
     return need_cast && (!spellInfo->CasterAuraState || HasAuraState(AuraStateType(spellInfo->CasterAuraState)));
@@ -6489,6 +6490,13 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 if (SkillLineAbilityEntry const* pAbility = sSkillLineAbilityStore.LookupEntry(j))
                     if (pAbility->skillId == id)
                         RemoveSpell(sSpellMgr->GetFirstSpellInChain(pAbility->spellId));
+
+            // remove spec spells
+            if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(id))
+            {
+                for (uint8 k = 0; k != 4; ++k)
+                    RemoveSpell(data->spell[k]);
+            }
         }
     }
     else if (newVal)                                        //add
@@ -6518,7 +6526,22 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                     itr->second.uState = SKILL_CHANGED;
                 }
                 else
+                {
                     mSkillStatus.insert(SkillStatusMap::value_type(id, SkillStatusData(i, SKILL_NEW)));
+                    if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(id))
+                    {
+                        for (uint8 k = 0; k != 4; ++k)
+                        {
+                            if (data->spell[k])
+                            {
+                                if (!IsInWorld())
+                                    AddSpell(data->spell[k], true, true, true, false, false, true);
+                                else
+                                    LearnSpell(data->spell[k], true, true);
+                            }
+                        }
+                    }
+                }
 
                 // apply skill bonuses
                 SetUInt32Value(PLAYER_SKILL_BONUS_INDEX(i), 0);
@@ -14448,7 +14471,8 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                 {
                     CapitalCityVendorItemContainer container = xCapitalCityMgr->GetVendorItems(creature);
                     if (container.empty())
-                        continue;
+                        canTalk = false;
+                    break;
                 }
                 case GOSSIP_OPTION_LEARNDUALSPEC:
                     if (!(GetSpecsCount() == 1 && creature->isCanTrainingAndResetTalentsOf(this) && !(getLevel() < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL))))
@@ -14482,7 +14506,7 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                         TC_LOG_ERROR("sql.sql", "GOSSIP_OPTION_TRAINER:: Player %s (GUID: %u) request wrong gossip menu: %u with wrong class: %u at Creature: %s (Entry: %u, Trainer Class: %u)",
                         GetName().c_str(), GetGUIDLow(), menu->GetGossipMenu().GetMenuId(), getClass(), creature->GetName().c_str(), creature->GetEntry(), creature->GetCreatureTemplate()->trainer_class);*/
                     // no break;
-                    if (getClass() != creature->GetCreatureTemplate()->trainer_class && creature->GetCreatureTemplate()->trainer_type == TRAINER_TYPE_CLASS)
+                    if (creature->GetCreatureTemplate()->trainer_class && creature->GetCreatureTemplate()->trainer_type == TRAINER_TYPE_CLASS && getClass() != creature->GetCreatureTemplate()->trainer_class)
                         canTalk = false;
                     break;
                 case GOSSIP_OPTION_GOSSIP:
@@ -14507,7 +14531,7 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                         canTalk = false;
                     break;
                 case GOSSIP_OPTION_VIEW_RESEARCH:
-                    if (!creature->IsResearcher() || !xCapitalCityMgr->HaveAvailableResearch(creature->GetEntry()))
+                    if (!creature->IsResearcher() /*|| !xCapitalCityMgr->HaveAvailableResearch(creature->GetEntry())*/)
                         canTalk = false;
                     break;
                 default:
@@ -14766,6 +14790,7 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
         {
             if (creature)
                 StartResearch(creature, gossipListId);
+            PlayerTalkClass->SendCloseGossip();
             break;
         }
     }
@@ -14893,16 +14918,16 @@ void Player::PrepareQuestMenu(ObjectGuid guid)
             {
                 uint32 questID = list[i];
                 Quest const* quest = sObjectMgr->GetQuestTemplate(questID);
-                if (!quest || !CanTakeQuest(quest, true))
+                if (!quest)
                     continue;
-
                 QuestStatus status = GetQuestStatus(questID);
                 if (status == QUEST_STATUS_COMPLETE)
                     qm.AddMenuItem(questID, 4);
                 else if (status == QUEST_STATUS_INCOMPLETE)
                     qm.AddMenuItem(questID, 4);
-                else
-                    qm.AddMenuItem(questID, 2);
+                if (!CanTakeQuest(quest, false))
+                    continue;
+                qm.AddMenuItem(questID, 2);
             }
         }
     }
@@ -16486,6 +16511,8 @@ void Player::AreaExploredOrEventHappens(uint32 questId)
             {
                 q_status.Explored = true;
                 m_QuestStatusSave[questId] = QUEST_DEFAULT_SAVE_TYPE;
+                SetQuestSlotState(log_slot, QUEST_STATE_COMPLETE);
+                SendQuestComplete(questId);
             }
         }
         if (CanCompleteQuest(questId))
@@ -17316,8 +17343,8 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     //"arenaPoints, totalHonorPoints, todayHonorPoints, yesterdayHonorPoints, totalKills, todayKills, yesterdayKills, chosenTitle, knownCurrencies, watchedFaction, drunk, "
     // 50      51      52      53      54      55      56      57      58           59         60          61             62              63      64           65          66
     //"health, power1, power2, power3, power4, power5, power6, power7, instance_id, speccount, activespec, exploredZones, equipmentCache, ammoId, knownTitles, actionBars, grantableLevels, "
-    // 67         68
-    // WarSchool, SupremacyLevel
+    // 67         68              69           70
+    // WarSchool, SupremacyLevel, PrimaryStat, SecondaryStat
     // FROM characters WHERE guid = '%u'", guid);
     PreparedQueryResult result = holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_FROM);
     if (!result)
@@ -17390,6 +17417,8 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     m_WarSchool = fields[67].GetUInt32();
     m_SupremacyLevel = fields[68].GetUInt32();
     _LoadSupremacyStats(guid);
+    m_PrimaryStat = fields[69].GetUInt8();
+    m_SecondaryStat = fields[70].GetUInt8();
 
     SetUInt32Value(UNIT_FIELD_LEVEL, fields[6].GetUInt8());
     SetUInt32Value(PLAYER_XP, fields[7].GetUInt32());
@@ -19585,6 +19614,8 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setUInt8(index++, IsInWorld() && !GetSession()->PlayerLogout() ? 1 : 0);
         stmt->setUInt32(index++, m_WarSchool);
         stmt->setUInt32(index++, m_SupremacyLevel);
+        stmt->setUInt8(index++, m_PrimaryStat);
+        stmt->setUInt8(index++, m_SecondaryStat);
         // Index
         stmt->setUInt32(index++, GetGUIDLow());
     }
@@ -22191,7 +22222,7 @@ void Player::AddSpellAndCategoryCooldowns(SpellInfo const* spellInfo, uint32 ite
         if (rec > 0)
             ApplySpellMod(spellInfo->Id, SPELLMOD_COOLDOWN, rec, spell);
 
-        if (catrec > 0 && !(spellInfo->AttributesEx6 & SPELL_ATTR6_IGNORE_CATEGORY_COOLDOWN_MODS))
+        if (catrec > 0 && !spellInfo->HasAttribute(SPELL_ATTR6_IGNORE_CATEGORY_COOLDOWN_MODS))
             ApplySpellMod(spellInfo->Id, SPELLMOD_COOLDOWN, catrec, spell);
 
         if (int32 cooldownMod = GetTotalAuraModifier(SPELL_AURA_MOD_COOLDOWN))
@@ -24052,7 +24083,7 @@ bool Player::HasItemFitToSpellRequirements(SpellInfo const* spellInfo, Item cons
 bool Player::CanNoReagentCast(SpellInfo const* spellInfo) const
 {
     // don't take reagents for spells with SPELL_ATTR5_NO_REAGENT_WHILE_PREP
-    if (spellInfo->AttributesEx5 & SPELL_ATTR5_NO_REAGENT_WHILE_PREP &&
+    if (spellInfo->HasAttribute(SPELL_ATTR5_NO_REAGENT_WHILE_PREP) &&
         HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PREPARATION))
         return true;
 
@@ -24992,7 +25023,7 @@ void Player::RestoreBaseRune(uint8 index)
 {
     AuraEffect const* aura = m_runes->runes[index].ConvertAura;
     // If rune was converted by a non-pasive aura that still active we should keep it converted
-    if (aura && !(aura->GetSpellInfo()->Attributes & SPELL_ATTR0_PASSIVE))
+    if (aura && !aura->GetSpellInfo()->HasAttribute(SPELL_ATTR0_PASSIVE))
         return;
     ConvertRune(index, GetBaseRune(index));
     SetRuneConvertAura(index, NULL);
@@ -27446,7 +27477,7 @@ void Player::SendResearchDetail(Creature* creature, uint8 index)
     {
         SendResearchProgressState(state);
         if (state->state == CC_RESEARCH_STATE_NOT_STARTED && xCapitalCityMgr->HaveAllReagentForNextResearch(creature, index))
-            PlayerTalkClass->GetGossipMenu().AddMenuItem(55070, 0, 1, index);
+            PlayerTalkClass->GetGossipMenu().AddMenuItem(index, GOSSIP_ICON_INTERACT_1, 78803, 0, GOSSIP_OPTION_RESEARCH_START, 78807, 0);
     }
     else
         SendFirstRankResearchState(data);
@@ -27498,4 +27529,35 @@ void Player::StartResearch(Creature* researcher, uint8 index)
         return;
     else if (state->state == CC_RESEARCH_STATE_NOT_STARTED)
         xCapitalCityMgr->StartResearch(researcher, index, GetTeam());
+}
+
+float Player::GetPrimaryStat() const
+{
+    if (!m_PrimaryStat || m_PrimaryStat >= MAX_STATS)
+        return 0;
+
+    return GetStat((Stats)m_PrimaryStat);
+}
+
+float Player::GetSecondaryStat() const
+{
+    if (!m_SecondaryStat || m_SecondaryStat >= MAX_STATS)
+        return 0;
+
+    return GetStat((Stats)m_SecondaryStat);
+}
+
+bool Player::CanLearnSpec(uint32 tier) const
+{
+    SpecSkillDataBounds bound = sObjectMgr->GetSpecSkillDataBounds(tier);
+    if (bound.first == bound.second)
+        return false;
+
+    for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    {
+        if (HasSkill(itr->second.skill))
+            return false;
+    }
+
+    return true;
 }

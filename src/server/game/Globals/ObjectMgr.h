@@ -674,6 +674,19 @@ struct DungeonEncounter
     uint32 lastEncounterDungeon;
 };
 
+struct SpecSkillData
+{
+    uint32 id;
+    uint32 skill;
+    uint32 spell[4];
+    std::string name;
+    uint32 description;
+};
+
+typedef std::map<uint32, std::string> SpecSkillTierMap;
+typedef std::multimap<uint32, SpecSkillData> SpecSkillDataMap;
+typedef std::pair<SpecSkillDataMap::const_iterator, SpecSkillDataMap::const_iterator> SpecSkillDataBounds;
+
 typedef std::list<DungeonEncounter const*> DungeonEncounterList;
 typedef std::unordered_map<uint32, DungeonEncounterList> DungeonEncounterContainer;
 
@@ -1387,6 +1400,18 @@ class ObjectMgr
         void LoadScripts(ScriptsType type);
         void LoadQuestRelationsHelper(QuestRelations& map, QuestRelationsReverse* reverseMap, std::string const& table, bool starter, bool go);
         void PlayerCreateInfoAddItemHelper(uint32 race_, uint32 class_, uint32 itemId, int32 count);
+
+        SpecSkillDataMap m_SpecSkillDataMap;
+        SpecSkillTierMap m_SpecSkillTierMap;
+    public:
+        void LoadSpecSkillDataMap();
+        const SpecSkillData* GetSpecSkillData(uint32 tier, uint32 id) const;
+        const SpecSkillData* GetSpecSkillData(uint32 skill) const;
+        std::string GetSpecTierName(uint32 tier);
+        SpecSkillDataBounds GetSpecSkillDataBounds(uint32 tier) { return m_SpecSkillDataMap.equal_range(tier); }
+        const SpecSkillDataMap* GetSpecSkillDataMap() { return &m_SpecSkillDataMap; }
+        const SpecSkillTierMap* GetSpecSkillMap() const { return &m_SpecSkillTierMap; }
+    private:
 
         MailLevelRewardContainer _mailLevelRewardStore;
 

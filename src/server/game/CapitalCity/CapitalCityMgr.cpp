@@ -909,6 +909,7 @@ void CapitalCityMgr::AddReagentTo(uint32 researcherEntry, uint32 item, uint32 co
         {
             CapitalCityNpcResearchState state = BuildNewResearchState(data, proto->ResearchSet[i], item, count);
             m_ResearchStateMap.insert(std::pair<uint32, CapitalCityNpcResearchState>(researcherEntry, state));
+            SaveResearchState(researcherEntry, &state);
         }
         else
         {
@@ -930,8 +931,8 @@ void CapitalCityMgr::AddReagentTo(uint32 researcherEntry, uint32 item, uint32 co
             }
 
             CapitalCityNpcResearchState state = BuildNewResearchState(data, proto->ResearchSet[i], item, count);
-            SaveResearchState(researcherEntry, &state);
             m_ResearchStateMap.insert(std::pair<uint32, CapitalCityNpcResearchState>(researcherEntry, state));
+            SaveResearchState(researcherEntry, &state);
         }
 
         return;

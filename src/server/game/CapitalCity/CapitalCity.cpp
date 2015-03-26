@@ -78,6 +78,7 @@ void CapitalCity::AddResource(int32 resource, Player* player/* = NULL*/)
         sWorld->SendGlobalChatMessageToTeam(sObjectMgr->GetServerMessage(14, GetName().c_str(), resource).c_str(), m_Team);
     else
         sWorld->SendGlobalChatMessageToTeam(sObjectMgr->GetServerMessage(15, player->GetName().c_str(), GetName().c_str(), resource).c_str(), m_Team);
+    Save();
 }
 
 void CapitalCity::AddMagicPower(int32 magic, Player* player/* = NULL*/)
@@ -89,6 +90,7 @@ void CapitalCity::AddMagicPower(int32 magic, Player* player/* = NULL*/)
         sWorld->SendGlobalChatMessageToTeam(sObjectMgr->GetServerMessage(16, GetName().c_str(), magic).c_str(), m_Team);
     else
         sWorld->SendGlobalChatMessageToTeam(sObjectMgr->GetServerMessage(17, player->GetName().c_str(), GetName().c_str(), magic).c_str(), m_Team);
+    Save();
 }
 
 void CapitalCity::RankUp(bool sendUpdate)
@@ -101,6 +103,7 @@ void CapitalCity::RankUp(bool sendUpdate)
     LearnRankUpSpells(m_Rank);
     if (sendUpdate)
         SendStateUpdate();
+    Save();
 }
 
 void CapitalCity::Update()
@@ -132,6 +135,8 @@ void CapitalCity::Update()
 
         SendStateUpdate();
     }
+
+    Save();
 }
 
 void CapitalCity::TryStartUpgrade(Player* commander)
@@ -166,6 +171,8 @@ void CapitalCity::UpgradeStop(Player* commander)
     if (commander)
         sWorld->SendGlobalChatMessageToTeam(sObjectMgr->GetServerMessage(29, commander->GetName().c_str(), GetName().c_str()).c_str(), m_Team);
     SendStateUpdate();
+
+    Save();
 }
 
 void CapitalCity::LearnRankUpSpells(uint32 rank)

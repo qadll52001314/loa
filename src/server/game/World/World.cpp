@@ -1375,6 +1375,8 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Loading Server Messages...");
     sObjectMgr->LoadServerMesssages();
 
+    sObjectMgr->LoadSpecSkillDataMap();
+
     ///- Update the realm entry in the database with the realm type from the config file
     //No SQL injection as values are treated as integers
 

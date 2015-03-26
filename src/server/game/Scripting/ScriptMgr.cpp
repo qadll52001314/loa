@@ -184,9 +184,8 @@ struct TSpellSummary
     uint8 Effects;                                          // set of enum SelectEffect
 } *SpellSummary;
 
-ScriptMgr::ScriptMgr() : _scriptCount(0)
+ScriptMgr::ScriptMgr() : _scriptCount(0), _scheduledScripts(0)
 {
-    _scheduledScripts = 0;
 }
 
 ScriptMgr::~ScriptMgr() { }

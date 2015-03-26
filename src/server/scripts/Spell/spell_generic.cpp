@@ -4109,6 +4109,197 @@ public:
     }
 };
 
+// 81414 - Spec_tier1_1_damage_proc
+class spell_spec_tier1_1_damage_proc : public SpellScriptLoader
+{
+public:
+    spell_spec_tier1_1_damage_proc() : SpellScriptLoader("spell_spec_tier1_1_damage_prc") { }
+
+    class spell_spec_tier1_1_damage_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier1_1_damage_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            return player && player->HasSkill(SKILL_SPEC_TIER1_1);
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_1);
+            int32 damage = CalculatePct(player->GetPrimaryStat(), 5.0f + skillvalue * 0.15f);
+            player->CastCustomSpell(procInfo.GetProcTarget(), 81570, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_1_damage_proc_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_1_damage_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier1_1_damage_proc_AuraScript();
+    }
+};
+
+// 81575 - Spec_tier1_1_heal_proc
+class spell_spec_tier1_1_heal_proc : public SpellScriptLoader
+{
+public:
+    spell_spec_tier1_1_heal_proc() : SpellScriptLoader("spell_spec_tier1_1_heal_proc") { }
+
+    class spell_spec_tier1_1_heal_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier1_1_heal_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            return player && player->HasSkill(SKILL_SPEC_TIER1_1);
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_1);
+            int32 damage = CalculatePct(player->GetPrimaryStat(), 5.0f + skillvalue * 0.15f);
+            player->CastCustomSpell(procInfo.GetProcTarget(), 81571, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_1_heal_proc_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_1_heal_proc_AuraScript::HandleTrigger, EFFECT_1, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier1_1_heal_proc_AuraScript();
+    }
+};
+
+// 81415 - spec_tier1_2_damage_proc
+class spell_spec_tier1_2_damage_proc : public SpellScriptLoader
+{
+public:
+    spell_spec_tier1_2_damage_proc() : SpellScriptLoader("spell_spec_tier1_2_damage_proc") {}
+
+    class spell_spec_tier1_2_damage_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier1_2_damage_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            return player && player->HasSkill(SKILL_SPEC_TIER1_2);
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_2);
+            if (frand(0, 100.0f) < (5.0f + skillvalue * 0.1f))
+            {
+                int32 damage = CalculatePct(player->GetPrimaryStat(), 150.0f);
+                player->CastCustomSpell(procInfo.GetProcTarget(), 81572, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_2_damage_proc_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_2_damage_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier1_2_damage_proc_AuraScript();
+    }
+};
+
+// 81415 - spec_tier1_2_damage_proc
+class spell_spec_tier1_2_heal_proc : public SpellScriptLoader
+{
+public:
+    spell_spec_tier1_2_heal_proc() : SpellScriptLoader("spell_spec_tier1_2_heal_proc") {}
+
+    class spell_spec_tier1_2_heal_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier1_2_heal_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            return player && player->HasSkill(SKILL_SPEC_TIER1_2);
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_2);
+            if (frand(0, 100.0f) < (5.0f + skillvalue * 0.1f))
+            {
+                int32 damage = CalculatePct(player->GetPrimaryStat(), 150.0f);
+                player->CastCustomSpell(procInfo.GetProcTarget(), 81573, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_2_heal_proc_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_2_heal_proc_AuraScript::HandleTrigger, EFFECT_1, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier1_2_heal_proc_AuraScript();
+    }
+};
+
+// 81416 - spec_tier1_3_effect_proc
+class spell_spec_tier1_3_spell_proc : public SpellScriptLoader
+{
+public:
+    spell_spec_tier1_3_spell_proc() : SpellScriptLoader("spell_spec_tier1_3_spell_proc") {}
+
+    class spell_spec_tier1_3_spell_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier1_3_spell_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            return player && player->HasSkill(SKILL_SPEC_TIER1_3);
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_3);
+            if (frand(0, 100.0f) < (10.0f + skillvalue * 0.2f))
+                player->AddAura(81574, player);
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_3_spell_proc_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_3_spell_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier1_3_spell_proc_AuraScript();
+    }
+};
+
 void AddSC_generic_spell_scripts()
 {
     new spell_gen_absorb0_hitlimit1();
@@ -4194,4 +4385,9 @@ void AddSC_generic_spell_scripts()
     new spell_gen_mixology_bonus();
     new spell_gen_wound_of_war_proc();
     new spell_gen_wound_of_war();
+    new spell_spec_tier1_1_damage_proc();
+    new spell_spec_tier1_1_heal_proc();
+    new spell_spec_tier1_2_damage_proc();
+    new spell_spec_tier1_2_heal_proc();
+    new spell_spec_tier1_3_spell_proc();
 }
