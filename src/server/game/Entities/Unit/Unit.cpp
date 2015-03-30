@@ -734,12 +734,20 @@ uint32 Unit::DealDamage(Unit* victim, uint32 damage, CleanDamage const* cleanDam
     {
         TC_LOG_DEBUG("entities.unit", "DealDamage: Damage above victim's health");
 
+        Player* player = ToPlayer();
+
         if (victim->GetTypeId() == TYPEID_PLAYER && victim != this)
             victim->ToPlayer()->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_TOTAL_DAMAGE_RECEIVED, health);
 
         if (victim->HasAuraType(SPELL_AURA_DEATH_ESCAPE))
         {
             // no special handling
+        }
+        else if (player && player->HasSkill(SKILL_SPEC_TIER4_10) && !player->HasSpellCooldown(81453))
+        {
+            player->AddSpellCooldown(81453, 0, time(NULL) + 120);
+            int32 damage = CountPctFromMaxHealth(50 + 0.5 * player->GetSkillValue(SKILL_SPEC_TIER4_10));
+            player->CastCustomSpell(player, 81616, &damage, NULL, NULL, true);
         }
         else if (Aura* aura = victim->GetAura(SPELL_SUNRAGE_PASSIVE)) // Sunrage(item 57339) effect, cant handle in spellscript
         {
@@ -1264,6 +1272,13 @@ void Unit::CalculateMeleeDamage(Unit* victim, uint32 damage, CalcDamageInfo* dam
             mod += GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_CRIT_PERCENT_VERSUS, crTypeMask);
             if (mod != 0)
                 AddPct(damageInfo->damage, mod);
+
+            if (Player* player = ToPlayer())
+            {
+                if (player->HasSkill(SKILL_SPEC_TIER1_5))
+                    ApplyPct(damageInfo->damage, 75.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_5));
+            }
+
             break;
         }
         case MELEE_HIT_PARRY:
@@ -2593,6 +2608,12 @@ SpellMissInfo Unit::MagicSpellHitResult(Unit* victim, SpellInfo const* spellInfo
 
     // Chance resist mechanic (select max value from every mechanic spell effect)
     int32 resist_chance = victim->GetMechanicResistChance(spellInfo) * 100;
+    if (Player* player = victim->ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER4_9))
+            resist_chance += 5.0f + 0.05f * player->GetSkillValue(SKILL_SPEC_TIER4_9);
+    }
+
     tmp += resist_chance;
 
     // Chance resist debuff
@@ -2617,7 +2638,17 @@ SpellMissInfo Unit::MagicSpellHitResult(Unit* victim, SpellInfo const* spellInfo
 
     // Roll chance
     if (rand < tmp)
+    {
+        if (Player* player = victim->ToPlayer())
+        {
+            if (player->HasSkill(SKILL_SPEC_TIER4_9) && !player->HasSpellCooldown(81452))
+            {
+                player->AddAura(81615, player);
+                player->AddSpellCooldown(81452, 0, time(NULL) + 6);
+            }
+        }
         return SPELL_MISS_RESIST;
+    }
 
     // cast by caster in front of victim
     if (victim->HasInArc(float(M_PI), this) || victim->HasAuraType(SPELL_AURA_IGNORE_HIT_DIRECTION))
@@ -5633,6 +5664,8 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
                     return true;
                 }
                 case 81574:
+                case 81587:
+                case 81595:
                 {
                     triggeredByAura->GetBase()->Remove();
                     return true;
@@ -10370,8 +10403,20 @@ float Unit::SpellDamagePctDone(Unit* victim, SpellInfo const* spellProto, Damage
 
     if (GetTypeId() == TYPEID_PLAYER)
     {
-        if (ToPlayer()->HasSkill(SKILL_SPEC_TIER1_4))
-            DoneTotalMod += 0.1f + 0.015f * ToPlayer()->GetSkillValue(SKILL_SPEC_TIER1_4);
+        const Player* player = ToPlayer();
+        if (player->HasSkill(SKILL_SPEC_TIER1_4))
+            DoneTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_4);
+
+        if (player->HasSkill(SKILL_SPEC_TIER3_4))
+        {
+            if (victim->HasAuraWithMechanic(1 << MECHANIC_STUN) || victim->HasAuraWithMechanic(1 << MECHANIC_SAPPED) || victim->HasAuraWithMechanic(1 << MECHANIC_KNOCKOUT))
+                DoneTotalMod += 0.2f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER3_4);
+            else if (victim->HasAuraWithMechanic(1 << MECHANIC_ROOT) || victim->HasAuraWithMechanic(1 << MECHANIC_SNARE) || victim->HasAuraWithMechanic(1 << MECHANIC_SILENCE))
+                DoneTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER3_4);
+        }
+
+        if (player->HasSkill(SKILL_SPEC_TIER3_8))
+            DoneTotalMod += -0.2f - 0.002f * player->GetSkillValue(SKILL_SPEC_TIER3_8);
     }
 
     return DoneTotalMod;
@@ -10435,6 +10480,11 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
             if ((*i)->GetCasterGUID() == caster->GetGUID() && (*i)->IsAffectedOnSpell(spellProto))
                 AddPct(TakenTotalMod, (*i)->GetAmount());
 
+        AuraEffectList const& mOwnerTaken2 = GetAuraEffectsByType(SPELL_AURA_MOD_DAMAGE_FROM_CASTER_NO_MASK);
+        for (AuraEffectList::const_iterator i = mOwnerTaken.begin(); i != mOwnerTaken.end(); ++i)
+            if ((*i)->GetCasterGUID() == caster->GetGUID())
+                AddPct(TakenTotalMod, (*i)->GetAmount());
+
         int32 TakenAdvertisedBenefit = SpellBaseDamageBonusTaken(spellProto->GetSchoolMask());
 
         // Check for table values
@@ -10458,6 +10508,25 @@ uint32 Unit::SpellDamageBonusTaken(Unit* caster, SpellInfo const* spellProto, ui
                 coeff /= 100.0f;
             }
             TakenTotal += int32(TakenAdvertisedBenefit * coeff * factorMod);
+        }
+    }
+
+    if (const Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER4_5))
+            TakenTotalMod -= 0.1f - 0.001f * player->GetSkillValue(SKILL_SPEC_TIER4_5);
+        if (player->HasSkill(SKILL_SPEC_TIER4_8))
+            TakenTotalMod -= 0.1f - 0.001f * player->GetSkillValue(SKILL_SPEC_TIER4_8);
+    }
+
+    if (TakenTotalMod < 1)
+    {
+        if (Player* player = caster->ToPlayer())
+        {
+            if (player->HasSkill(SKILL_SPEC_TIER1_9))
+                TakenTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_9);
+            if (TakenTotalMod > 1.0f)
+                TakenTotalMod = 1.0f;
         }
     }
 
@@ -10765,7 +10834,7 @@ uint32 Unit::SpellCriticalDamageBonus(SpellInfo const* spellProto, uint32 damage
     if (Player* player = ToPlayer())
     {
         if (player->HasSkill(SKILL_SPEC_TIER1_5))
-            ApplyPct(crit_bonus, 75.0f + 0.2f * player->GetSkillValue(799));
+            ApplyPct(crit_bonus, 75.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_5));
     }
 
     crit_bonus -= damage;
@@ -10802,6 +10871,12 @@ uint32 Unit::SpellCriticalHealingBonus(SpellInfo const* spellProto, uint32 damag
     {
         uint32 creatureTypeMask = victim->GetCreatureTypeMask();
         crit_bonus = int32(crit_bonus * GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_CRIT_PERCENT_VERSUS, creatureTypeMask));
+    }
+
+    if (Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER1_5))
+            ApplyPct(crit_bonus, 75.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_5));
     }
 
     if (crit_bonus > 0)
@@ -10991,7 +11066,10 @@ float Unit::SpellHealingPctDone(Unit* victim, SpellInfo const* spellProto) const
     if (GetTypeId() == TYPEID_PLAYER)
     {
         if (ToPlayer()->HasSkill(SKILL_SPEC_TIER1_4))
-            DoneTotalMod += 0.1f + 0.015f * ToPlayer()->GetSkillValue(SKILL_SPEC_TIER1_4);
+            DoneTotalMod += 0.1f + 0.001f * ToPlayer()->GetSkillValue(SKILL_SPEC_TIER1_4);
+
+        if (ToPlayer()->HasSkill(SKILL_SPEC_TIER3_8))
+            DoneTotalMod += -0.2f - 0.002f * ToPlayer()->GetSkillValue(SKILL_SPEC_TIER3_8);
     }
 
     return DoneTotalMod;
@@ -11002,11 +11080,11 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
     float TakenTotalMod = 1.0f;
 
     // Healing taken percent
-    float minval = float(GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HEALING_PCT));
+    float minval = float(GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HEALING_TAKEN_PCT));
     if (minval)
         AddPct(TakenTotalMod, minval);
 
-    float maxval = float(GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HEALING_PCT));
+    float maxval = float(GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HEALING_TAKEN_PCT));
     if (maxval)
         AddPct(TakenTotalMod, maxval);
 
@@ -11032,11 +11110,11 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
     if (damagetype == DOT)
     {
         // Healing over time taken percent
-        float minval_hot = float(GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HOT_PCT));
+        float minval_hot = float(GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HOT_TAKEN_PCT));
         if (minval_hot)
             AddPct(TakenTotalMod, minval_hot);
 
-        float maxval_hot = float(GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HOT_PCT));
+        float maxval_hot = float(GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HOT_TAKEN_PCT));
         if (maxval_hot)
             AddPct(TakenTotalMod, maxval_hot);
     }
@@ -11083,6 +11161,11 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
         if (caster->GetGUID() == (*i)->GetCasterGUID() && (*i)->IsAffectedOnSpell(spellProto))
             AddPct(TakenTotalMod, (*i)->GetAmount());
 
+    AuraEffectList const& mOwnerTaken = GetAuraEffectsByType(SPELL_AURA_MOD_HEAL_FROM_CASTER_NO_MASK);
+    for (AuraEffectList::const_iterator i = mOwnerTaken.begin(); i != mOwnerTaken.end(); ++i)
+        if ((*i)->GetCasterGUID() == caster->GetGUID())
+            AddPct(TakenTotalMod, (*i)->GetAmount());
+
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
     {
         switch (spellProto->Effects[i].ApplyAuraName)
@@ -11095,6 +11178,17 @@ uint32 Unit::SpellHealingBonusTaken(Unit* caster, SpellInfo const* spellProto, u
         }
         if (spellProto->Effects[i].Effect == SPELL_EFFECT_HEALTH_LEECH)
             TakenTotal = 0;
+    }
+
+    if (TakenTotalMod < 1.0f)
+    {
+        if (Player* player = caster->ToPlayer())
+        {
+            if (player->HasSkill(SKILL_SPEC_TIER1_9))
+                TakenTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_9);
+            if (TakenTotalMod > 1.0f)
+                TakenTotalMod = 1.0f;
+        }
     }
 
     float heal = float(int32(healamount) + TakenTotal) * TakenTotalMod;
@@ -11139,7 +11233,7 @@ int32 Unit::SpellBaseHealingBonusTaken(SpellSchoolMask schoolMask) const
 {
     int32 advertisedBenefit = 0;
 
-    AuraEffectList const& mDamageTaken = GetAuraEffectsByType(SPELL_AURA_MOD_HEALING);
+    AuraEffectList const& mDamageTaken = GetAuraEffectsByType(SPELL_AURA_MOD_HEALING_TAKEN);
     for (AuraEffectList::const_iterator i = mDamageTaken.begin(); i != mDamageTaken.end(); ++i)
         if (((*i)->GetMiscValue() & schoolMask) != 0)
             advertisedBenefit += (*i)->GetAmount();
@@ -11447,6 +11541,7 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
 
     // Custom scripted damage
     if (spellProto)
+    {
         switch (spellProto->SpellFamilyName)
         {
             case SPELLFAMILY_DEATHKNIGHT:
@@ -11455,8 +11550,19 @@ uint32 Unit::MeleeDamageBonusDone(Unit* victim, uint32 pdamage, WeaponAttackType
                     if (AuraEffect* aurEff = GetDummyAuraEffect(SPELLFAMILY_DEATHKNIGHT, 196, 0))
                         if (victim->GetDiseasesByCaster(owner->GetGUID()) > 0)
                             AddPct(DoneTotalMod, aurEff->GetAmount());
-            break;
+                break;
         }
+    }
+
+    if (GetTypeId() == TYPEID_PLAYER)
+    {
+        const Player* player = ToPlayer();
+        if (player->HasSkill(SKILL_SPEC_TIER1_4))
+            DoneTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_4);
+
+        if (player->HasSkill(SKILL_SPEC_TIER3_8))
+            DoneTotalMod += -0.2f - 0.002f * player->GetSkillValue(SKILL_SPEC_TIER3_8);
+    }
 
     float tmpDamage = float(int32(pdamage) + DoneFlatBenefit) * DoneTotalMod;
 
@@ -11568,6 +11674,25 @@ uint32 Unit::MeleeDamageBonusTaken(Unit* attacker, uint32 pdamage, WeaponAttackT
         AuraEffectList const& mModRangedDamageTakenPercent = GetAuraEffectsByType(SPELL_AURA_MOD_RANGED_DAMAGE_TAKEN_PCT);
         for (AuraEffectList::const_iterator i = mModRangedDamageTakenPercent.begin(); i != mModRangedDamageTakenPercent.end(); ++i)
             AddPct(TakenTotalMod, (*i)->GetAmount());
+    }
+
+    if (const Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER4_5))
+            TakenTotalMod -= 0.1f - 0.001f * player->GetSkillValue(SKILL_SPEC_TIER4_5);
+        if (player->HasSkill(SKILL_SPEC_TIER4_8))
+            TakenTotalMod -= 0.1f - 0.001f * player->GetSkillValue(SKILL_SPEC_TIER4_8);
+    }
+
+    if (TakenTotalMod < 1)
+    {
+        if (Player* player = attacker->ToPlayer())
+        {
+            if (player->HasSkill(SKILL_SPEC_TIER1_9))
+                TakenTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_9);
+            if (TakenTotalMod > 1.0f)
+                TakenTotalMod = 1.0f;
+        }
     }
 
     float tmpDamage = 0.0f;
@@ -12181,6 +12306,12 @@ int32 Unit::ModifyHealth(int32 dVal)
         gain = maxHealth - curHealth;
     }
 
+    if (Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER2_6))
+            UpdateSpeed(MOVE_RUN, true);
+    }
+
     return gain;
 }
 
@@ -12330,6 +12461,13 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced)
                 main_speed_mod  = GetMaxPositiveAuraModifier(SPELL_AURA_MOD_INCREASE_SPEED);
                 stack_bonus     = GetTotalAuraMultiplier(SPELL_AURA_MOD_SPEED_ALWAYS);
                 non_stack_bonus += GetMaxPositiveAuraModifier(SPELL_AURA_MOD_SPEED_NOT_STACK) / 100.0f;
+                if (Player* player = ToPlayer())
+                {
+                    if (player->HasSkill(SKILL_SPEC_TIER2_1))
+                        main_speed_mod += 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER2_1);
+                    if (player->HasSkill(SKILL_SPEC_TIER2_6))
+                        main_speed_mod += (3.0f + 0.03f * player->GetSkillValue(SKILL_SPEC_TIER2_6)) * (100.0f - player->GetHealthPct());
+                }
             }
             break;
         }
@@ -12651,7 +12789,15 @@ float Unit::ApplyTotalThreatModifier(float fThreat, SpellSchoolMask schoolMask)
 
     SpellSchools school = GetFirstSchoolInMask(schoolMask);
 
-    return fThreat * m_threatModifier[school];
+    fThreat *= m_threatModifier[school];
+
+    if (Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER4_8))
+            fThreat *= 2.0f + 0.01f * player->GetSkillValue(SKILL_SPEC_TIER4_8);
+    }
+
+    return fThreat;
 }
 
 //======================================================================
@@ -13041,6 +13187,7 @@ void Unit::ModSpellCastTime(SpellInfo const* spellInfo, int32 & castTime, Spell*
         castTime = int32(float(castTime) * GetFloatValue(UNIT_MOD_CAST_SPEED));
     else if (spellInfo->HasAttribute(SPELL_ATTR0_REQ_AMMO) && !spellInfo->HasAttribute(SPELL_ATTR2_AUTOREPEAT_FLAG))
         castTime = int32(float(castTime) * m_modAttackSpeedPct[RANGED_ATTACK]);
+        
     else if (spellInfo->SpellVisual[0] == 3881 && HasAura(67556)) // cooking with Chef Hat.
         castTime = 500;
 }
@@ -17406,6 +17553,12 @@ void Unit::RewardRage(uint32 damage, uint32 weaponSpeedHitFactor, bool attacker)
         // Berserker Rage effect
         if (HasAura(18499))
             addRage *= 2.0f;
+    }
+
+    if (Player* player = ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER1_10))
+            addRage *= 1.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_10);
     }
 
     addRage *= sWorld->getRate(RATE_POWER_RAGE_INCOME);

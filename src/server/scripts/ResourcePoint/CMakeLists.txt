@@ -8,9 +8,7 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-message(" - Resource Point")
 file(GLOB_RECURSE scripts_ResourcePoint ResourcePoint/*.cpp ResourcePoint/*.h)
-source_group("ResourcePoint" FILES ${scripts_ResourcePoint})
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}

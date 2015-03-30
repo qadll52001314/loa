@@ -2379,6 +2379,7 @@ class Player : public Unit, public GridObject<Player>
         float GetPrimaryStat() const;
         float GetSecondaryStat() const;
         bool CanLearnSpec(uint32 tier) const;
+        void UnlearnSpecTier(uint32 tier);
     private:
         uint32 m_SupremacyStats[MAX_STATS];
         uint32 m_SupremacyLevel;

@@ -260,6 +260,9 @@ void Player::UpdateArmor()
 
     value *= GetModifierValue(unitMod, TOTAL_PCT);
 
+    if (HasSkill(SKILL_SPEC_TIER4_2))
+        value *= 1.0f + 0.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER4_2);
+
     SetArmor(int32(value));
 
     Pet* pet = GetPet();
@@ -898,6 +901,12 @@ void Player::UpdateManaRegen()
         power_regen_mp5 += GetStat(Stats((*i)->GetMiscValue())) * (*i)->GetAmount() / 500.0f;
     }
 
+    if (HasSkill(SKILL_SPEC_TIER1_10))
+    {
+        power_regen_mp5 *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
+        power_regen *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
+    }
+
     // Set regen rate in cast state apply only on spirit based regen
     int32 modManaRegenInterrupt = GetTotalAuraModifier(SPELL_AURA_MOD_MANA_REGEN_INTERRUPT);
     if (modManaRegenInterrupt > 100)
@@ -934,6 +943,16 @@ void Player::_ApplyAllStatBonuses()
 
     _ApplyAllAuraStatMods();
     _ApplyAllItemMods();
+
+    // apply spec2-2 effects
+    if (HasSkill(SKILL_SPEC_TIER2_2))
+    {
+        float val = -0.1f - 0.001f * GetSkillValue(SKILL_SPEC_TIER2_2);
+        ApplyPercentModFloatValue(UNIT_MOD_CAST_SPEED, val, true);
+        ApplyPercentModFloatValue(UNIT_FIELD_BASEATTACKTIME + BASE_ATTACK, val, true);
+        ApplyPercentModFloatValue(UNIT_FIELD_BASEATTACKTIME + OFF_ATTACK, val, true);
+        ApplyPercentModFloatValue(UNIT_FIELD_RANGEDATTACKTIME, val, true);
+    }
 
     SetCanModifyStats(true);
 

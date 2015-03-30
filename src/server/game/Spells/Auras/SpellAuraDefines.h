@@ -174,10 +174,10 @@ enum AuraType
     SPELL_AURA_OVERRIDE_CLASS_SCRIPTS                       = 112,
     SPELL_AURA_MOD_RANGED_DAMAGE_TAKEN                      = 113,
     SPELL_AURA_MOD_RANGED_DAMAGE_TAKEN_PCT                  = 114,
-    SPELL_AURA_MOD_HEALING                                  = 115,
+    SPELL_AURA_MOD_HEALING_TAKEN                            = 115,
     SPELL_AURA_MOD_REGEN_DURING_COMBAT                      = 116,
     SPELL_AURA_MOD_MECHANIC_RESISTANCE                      = 117,
-    SPELL_AURA_MOD_HEALING_PCT                              = 118,
+    SPELL_AURA_MOD_HEALING_TAKEN_PCT                        = 118,
     SPELL_AURA_119                                          = 119,  // old SPELL_AURA_SHARE_PET_TRACKING
     SPELL_AURA_UNTRACKABLE                                  = 120,
     SPELL_AURA_EMPATHY                                      = 121,
@@ -318,7 +318,7 @@ enum AuraType
     SPELL_AURA_NO_REAGENT_USE                               = 256,
     SPELL_AURA_MOD_TARGET_RESIST_BY_SPELL_CLASS             = 257,
     SPELL_AURA_258                                          = 258,
-    SPELL_AURA_MOD_HOT_PCT                                  = 259,
+    SPELL_AURA_MOD_HOT_TAKEN_PCT                            = 259,
     SPELL_AURA_SCREEN_EFFECT                                = 260,
     SPELL_AURA_PHASE                                        = 261,
     SPELL_AURA_ABILITY_IGNORE_AURASTATE                     = 262,
@@ -399,8 +399,8 @@ enum AuraType
     SPELL_AURA_MOD_RANGED_CRIT_DAMEGE_CHANCE_FROM_CASTER    = 337,  // NYI
     SPELL_AURA_MOD_SPELL_CRIT_DAMEGE_CHANCE_FROM_CASTER     = 338,  // NYI
     SPELL_AURA_MOD_SINGLE_PHASE                             = 339,  // NYI
-    SPELL_AURA_MOD_DAMAGE_AGAINST_CASTER                    = 340,  // NYI
-    SPELL_AURA_MOD_SALVATE_RATE                             = 341,  // NYI
+    SPELL_AURA_MOD_DAMAGE_FROM_CASTER_NO_MASK               = 340,  // NYI
+    SPELL_AURA_MOD_HEAL_FROM_CASTER_NO_MASK                 = 341,  // NYI
     TOTAL_AURAS                                             = 342
 };
 

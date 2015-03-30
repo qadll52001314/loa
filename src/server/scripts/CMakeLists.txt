@@ -15,9 +15,10 @@ if (USE_SCRIPTPCH)
   set(scripts_STAT_PCH_SRC PrecompiledHeaders/ScriptPCH.cpp)
 endif ()
 
-message("Core Scripts")
-include(Spell/CMakeLists.txt)
-include(Command/CMakeLists.txt)
+message(STATUS "SCRIPT PREPARATIONS")
+include(Spells/CMakeLists.txt)
+
+include(Commands/CMakeLists.txt)
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
@@ -27,19 +28,21 @@ set(scripts_STAT_SRCS
 )
 
 if(SCRIPTS)
-  message("Game Scripts")
-  include(CapitalCity/CMakeLists.txt)
-  include(Zone/CMakeLists.txt)
-  include(Dungeon/CMakeLists.txt)
-  include(Raid/CMakeLists.txt)
-  include(Battleground/CMakeLists.txt)
-  include(Event/CMakeLists.txt)
-  include(OutdoorPVP/CMakeLists.txt)
-  include(ResourcePoint/CMakeLists.txt)
-  include(Pet/CMakeLists.txt)
+  include(Custom/CMakeLists.txt)
   include(World/CMakeLists.txt)
-  include(Misc/CMakeLists.txt)
+  include(OutdoorPvP/CMakeLists.txt)
+  include(EasternKingdoms/CMakeLists.txt)
+  include(Kalimdor/CMakeLists.txt)
+  include(Outland/CMakeLists.txt)
+  include(Northrend/CMakeLists.txt)
+  include(Events/CMakeLists.txt)
+  include(Pet/CMakeLists.txt)
+  include(CapitalCity/CMakeLists.txt)
+  include(ResourcePoint/CMakeLists.txt)
 endif()
+
+message(STATUS "SCRIPT PREPARATION COMPLETE")
+message("")
 
 include_directories(
   ${CMAKE_BINARY_DIR}
@@ -135,11 +138,9 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src/server/game/Skills
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells
   ${CMAKE_SOURCE_DIR}/src/server/game/Spells/Auras
-  ${CMAKE_SOURCE_DIR}/src/server/game/Supremacy
   ${CMAKE_SOURCE_DIR}/src/server/game/Texts
   ${CMAKE_SOURCE_DIR}/src/server/game/Tickets
   ${CMAKE_SOURCE_DIR}/src/server/game/Tools
-  ${CMAKE_SOURCE_DIR}/src/server/game/Transmogrification
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden
   ${CMAKE_SOURCE_DIR}/src/server/game/Warden/Modules
   ${CMAKE_SOURCE_DIR}/src/server/game/WarSchool
@@ -149,6 +150,8 @@ include_directories(
   ${MYSQL_INCLUDE_DIR}
   ${VALGRIND_INCLUDE_DIR}
 )
+
+GroupSources(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(scripts STATIC
   ${scripts_STAT_SRCS}

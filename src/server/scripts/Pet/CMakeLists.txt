@@ -8,11 +8,14 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-message(" - Pet")
-file(GLOB_RECURSE scripts_Pet Pet/*.cpp Pet/*.h)
-source_group("Pet" FILES ${scripts_Pet})
-
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}
-  ${scripts_Pet}
+  Pet/pet_dk.cpp
+  Pet/pet_generic.cpp
+  Pet/pet_hunter.cpp
+  Pet/pet_mage.cpp
+  Pet/pet_priest.cpp
+  Pet/pet_shaman.cpp
 )
+
+message("  -> Prepared: Pet")

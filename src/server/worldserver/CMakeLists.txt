@@ -8,23 +8,19 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-message(" - Command Line")
-file(GLOB_RECURSE sources_CommandLine CommandLine/*.cpp CommandLine/*.h)
-source_group("CommandLine" FILES ${sources_CommandLine})
-message(" - Remote Access")
-file(GLOB_RECURSE sources_RemoteAccess RemoteAccess/*.cpp RemoteAccess/*.h)
-source_group("RemoteAccess" FILES ${sources_RemoteAccess})
-message(" - TC SOAP")
-file(GLOB_RECURSE sources_TCSoap TCSoap/*.cpp TCSoap/*.h)
-source_group("TCSoap" FILES ${sources_TCSoap})
-message(" - World Server")
-file(GLOB sources_localdir *.cpp *.h)
-source_group("Worldserver" FILES ${sources_localdir})
-
 if (USE_COREPCH)
   set(worldserver_PCH_HDR PrecompiledHeaders/worldPCH.h)
   set(worldserver_PCH_SRC PrecompiledHeaders/worldPCH.cpp)
 endif()
+
+message(" - Command Line")
+file(GLOB_RECURSE sources_CommandLine CommandLine/*.cpp CommandLine/*.h)
+message(" - Remote Access")
+file(GLOB_RECURSE sources_RemoteAccess RemoteAccess/*.cpp RemoteAccess/*.h)
+message(" - TC SOAP")
+file(GLOB_RECURSE sources_TCSoap TCSoap/*.cpp TCSoap/*.h)
+message(" - World Server")
+file(GLOB sources_localdir *.cpp *.h)
 
 set(worldserver_SRCS
   ${worldserver_SRCS}
@@ -156,6 +152,8 @@ include_directories(
   ${OPENSSL_INCLUDE_DIR}
   ${VALGRIND_INCLUDE_DIR}
 )
+
+GroupSources(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(worldserver
   ${worldserver_SRCS}

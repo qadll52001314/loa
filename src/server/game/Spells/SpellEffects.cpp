@@ -1815,6 +1815,15 @@ void Spell::EffectEnergize(SpellEffIndex effIndex)
 
     m_caster->EnergizeBySpell(unitTarget, m_spellInfo->Id, damage, power);
 
+    if (Player* player = unitTarget->ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER2_5))
+        {
+            int32 value = 20 + 0.2 * player->GetSkillValue(SKILL_SPEC_TIER2_5);
+            player->CastCustomSpell(player, 81584, &value, NULL, NULL, true);
+        }
+    }
+
     // Mad Alchemist's Potion
     if (m_spellInfo->Id == 45051)
     {
@@ -6188,6 +6197,7 @@ enum WarMailSenderEntry
     WAR_MAIL_SENDER_ALLIANCE        = 43296
 };
 
+// these 2 effect can only be sent by creatures
 void Spell::EffectGrantCityResource(SpellEffIndex effIndex)
 {
     if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)

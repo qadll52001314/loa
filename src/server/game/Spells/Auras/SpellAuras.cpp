@@ -1392,6 +1392,15 @@ void Aura::HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, b
                         if (target->HasAura(61988) && !target->HasAura(25771))
                             target->RemoveAura(61988);
                         break;
+                    case 81616:
+                        if (removeMode == AURA_REMOVE_BY_EXPIRE)
+                        {
+                            int32 damage = GetEffect(0)->GetAmount();
+                            target->CastCustomSpell(target, 81617, &damage, NULL, NULL, true);
+                        }
+                        else
+                            target->Kill(target, false);
+                        break;
                     default:
                         break;
                 }

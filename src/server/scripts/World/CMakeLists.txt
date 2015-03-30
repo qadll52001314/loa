@@ -8,9 +8,7 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-message(" - World")
 file(GLOB_RECURSE sources_World World/*.cpp World/*.h)
-source_group("World" FILES ${sources_World})
 
 set(scripts_STAT_SRCS
   ${scripts_STAT_SRCS}

@@ -559,7 +559,11 @@ void AuraEffect::CalculatePeriodic(Unit* caster, bool create, bool load)
     {
         // Apply periodic time mod
         if (modOwner)
+        {
             modOwner->ApplySpellMod(GetId(), SPELLMOD_ACTIVATION_TIME, m_amplitude);
+            if (modOwner->HasSkill(SKILL_SPEC_TIER2_8))
+                m_amplitude *= 0.85f - 0.001f * modOwner->GetSkillValue(SKILL_SPEC_TIER2_8);
+        }
 
         if (caster)
         {
@@ -6131,24 +6135,35 @@ void AuraEffect::HandlePeriodicHealAurasTick(Unit* target, Unit* caster) const
             AddPct(TakenTotalMod, Tenacity->GetAmount());
 
         // Healing taken percent
-        float minval = (float)target->GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HEALING_PCT);
+        float minval = (float)target->GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HEALING_TAKEN_PCT);
         if (minval)
             AddPct(TakenTotalMod, minval);
 
-        float maxval = (float)target->GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HEALING_PCT);
+        float maxval = (float)target->GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HEALING_TAKEN_PCT);
         if (maxval)
             AddPct(TakenTotalMod, maxval);
 
         // Healing over time taken percent
-        float minval_hot = (float)target->GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HOT_PCT);
+        float minval_hot = (float)target->GetMaxNegativeAuraModifier(SPELL_AURA_MOD_HOT_TAKEN_PCT);
         if (minval_hot)
             AddPct(TakenTotalMod, minval_hot);
 
-        float maxval_hot = (float)target->GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HOT_PCT);
+        float maxval_hot = (float)target->GetMaxPositiveAuraModifier(SPELL_AURA_MOD_HOT_TAKEN_PCT);
         if (maxval_hot)
             AddPct(TakenTotalMod, maxval_hot);
 
         TakenTotalMod = std::max(TakenTotalMod, 0.0f);
+
+        if (TakenTotalMod < 1.0f)
+        {
+            if (Player* player = caster->ToPlayer())
+            {
+                if (player->HasSkill(SKILL_SPEC_TIER1_9))
+                    TakenTotalMod += 0.1f + 0.001f * player->GetSkillValue(SKILL_SPEC_TIER1_9);
+                if (TakenTotalMod > 1.0f)
+                    TakenTotalMod = 1.0f;
+            }
+        }
 
         damage = uint32(target->CountPctFromMaxHealth(damage));
         damage = uint32(damage * TakenTotalMod);
@@ -6361,6 +6376,15 @@ void AuraEffect::HandlePeriodicEnergizeAuraTick(Unit* target, Unit* caster) cons
 
     if (caster)
         target->getHostileRefManager().threatAssist(caster, float(gain) * 0.5f, GetSpellInfo());
+
+    if (Player* player = target->ToPlayer())
+    {
+        if (player->HasSkill(SKILL_SPEC_TIER2_5))
+        {
+            int32 value = 20 + 0.2 * player->GetSkillValue(SKILL_SPEC_TIER2_5);
+            player->CastCustomSpell(player, 81584, &value, NULL, NULL, true);
+        }
+    }
 }
 
 void AuraEffect::HandlePeriodicPowerBurnAuraTick(Unit* target, Unit* caster) const

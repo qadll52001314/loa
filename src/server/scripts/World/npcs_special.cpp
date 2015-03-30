@@ -2387,6 +2387,11 @@ enum NpcShilvasaExatierGossip
     GOSSIP_ACTION_SPEC_NAV_TO_TIER3 = 1005,
     GOSSIP_ACTION_SPEC_NAV_TO_TIER4 = 1006,
     GOSSIP_ACTION_SPEC_NAV_TO_TIER5 = 1007,
+    GOSSIP_ACTION_SPEC_UNLEARN_TIER1 = 1008,
+    GOSSIP_ACTION_SPEC_UNLEARN_TIER2 = 1009,
+    GOSSIP_ACTION_SPEC_UNLEARN_TIER3 = 1010,
+    GOSSIP_ACTION_SPEC_UNLEARN_TIER4 = 1011,
+    GOSSIP_ACTION_SPEC_UNLEARN_TIER5 = 1012,
     GOSSIP_ACTION_VIEW_SPEC_LIST = 2000,
     GOSSIP_ACTION_SPEC_TIER1_START = 3000,
     GOSSIP_ACTION_SPEC_TIER2_START = 4000,
@@ -2432,6 +2437,26 @@ public:
                 case GOSSIP_ACTION_SPEC_NAV_TO_TIER5:
                     BuildSpecMenu(player, creature, 5);
                     break;
+                case GOSSIP_ACTION_SPEC_UNLEARN_TIER1:
+                    player->UnlearnSpecTier(1);
+                    player->CLOSE_GOSSIP_MENU();
+                    break;
+                case GOSSIP_ACTION_SPEC_UNLEARN_TIER2:
+                    player->UnlearnSpecTier(2);
+                    player->CLOSE_GOSSIP_MENU();
+                    break;
+                case GOSSIP_ACTION_SPEC_UNLEARN_TIER3:
+                    player->UnlearnSpecTier(3);
+                    player->CLOSE_GOSSIP_MENU();
+                    break;
+                case GOSSIP_ACTION_SPEC_UNLEARN_TIER4:
+                    player->UnlearnSpecTier(4);
+                    player->CLOSE_GOSSIP_MENU();
+                    break;
+                case GOSSIP_ACTION_SPEC_UNLEARN_TIER5:
+                    player->UnlearnSpecTier(5);
+                    player->CLOSE_GOSSIP_MENU();
+                    break;
                 default:
                     break;
             }
@@ -2470,6 +2495,8 @@ public:
         {
             uint32 skill = action - GOSSIP_ACTION_SPEC_LEARN_START;
             // learn skill
+            player->SetSkill(skill, 1, 1, 100);
+            player->CLOSE_GOSSIP_MENU();
         }
 
         return true;
@@ -2493,27 +2520,33 @@ public:
 
         uint32 action = 0;
         uint32 text = 0;
+        uint32 unlearn = 0;
         switch (tier)
         {
             case 1:
                 action = GOSSIP_ACTION_SPEC_TIER1_START;
                 text = 31153;
+                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER1;
                 break;
             case 2:
                 action = GOSSIP_ACTION_SPEC_TIER2_START;
                 text = 31154;
+                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER2;
                 break;
             case 3:
                 action = GOSSIP_ACTION_SPEC_TIER3_START;
                 text = 31155;
+                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER3;
                 break;
             case 4:
                 action = GOSSIP_ACTION_SPEC_TIER4_START;
                 text = 31156;
+                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER4;
                 break;
             case 5:
                 action = GOSSIP_ACTION_SPEC_TIER5_START;
                 text = 31157;
+                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER5;
                 break;
             default:
                 break;
@@ -2521,6 +2554,8 @@ public:
 
         for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second.name, GOSSIP_SENDER_MAIN, action + itr->second.id);
+        if (!player->CanLearnSpec(tier))
+            player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(37, sObjectMgr->GetSpecTierName(tier).c_str()), GOSSIP_SENDER_MAIN, unlearn, sObjectMgr->GetServerMessage(38, sObjectMgr->GetSpecTierName(tier).c_str()), 0, false);
         player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST);
         player->SEND_GOSSIP_MENU(text, creature->GetGUID());
     }
@@ -2553,7 +2588,7 @@ public:
                     break;
             }
             if (player->CanLearnSpec(tier))
-                player->ADD_GOSSIP_ITEM_DB(55079, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_LEARN_START + data->skill);
+                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(35), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_LEARN_START + data->skill, sObjectMgr->GetServerMessage(36, sObjectMgr->GetSpecTierName(tier).c_str(), data->name.c_str()), 0, false);
             player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, nav);
             player->SEND_GOSSIP_MENU(data->description, creature->GetGUID());
         }

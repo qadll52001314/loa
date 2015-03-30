@@ -3899,8 +3899,6 @@ void ObjectMgr::BuildPlayerLevelInfo(uint8 race, uint8 _class, uint8 level, Play
     }
 }
 
-int32 const ReputationMgr::Reputation_Cap;
-
 void ObjectMgr::LoadQuests()
 {
     uint32 oldMSTime = getMSTime();
@@ -8566,7 +8564,7 @@ void ObjectMgr::LoadScriptNames()
         "UNION "
         "SELECT DISTINCT(ScriptName) FROM capital_cities WHERE ScriptName <> '' "
         "UNION "
-        "SELECT DISTINCT(ScriptName) FROM resource_points WHERE ScriptName <> ''");
+        "SELECT DISTINCT(ScriptName) FROM resource_points WHERE ScriptName <> '' ");
 
     if (!result)
     {
@@ -9180,4 +9178,12 @@ const SpecSkillData* ObjectMgr::GetSpecSkillData(uint32 skill) const
             return &itr->second;
     }
     return NULL;
+}
+
+std::string ObjectMgr::GetSpecTierName(uint32 tier)
+{
+    SpecSkillTierMap::const_iterator itr = m_SpecSkillTierMap.find(tier);
+    if (itr == m_SpecSkillTierMap.end())
+        return "";
+    return itr->second;
 }

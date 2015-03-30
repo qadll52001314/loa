@@ -2589,6 +2589,8 @@ void Player::Regenerate(Powers power)
         }   break;
         case POWER_ENERGY:                                  // Regenerate energy (rogue)
             addvalue += 0.01f * m_regenTimer * sWorld->getRate(RATE_POWER_ENERGY);
+            if (HasSkill(SKILL_SPEC_TIER1_10))
+                addvalue *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
             break;
         case POWER_RUNIC_POWER:
         {
@@ -6496,6 +6498,12 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
             {
                 for (uint8 k = 0; k != 4; ++k)
                     RemoveSpell(data->spell[k]);
+                switch (id)
+                {
+                    case SKILL_SPEC_TIER1_3:
+                        RemoveSpell(81574);
+                        break;
+                }
             }
         }
     }
@@ -6526,22 +6534,7 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                     itr->second.uState = SKILL_CHANGED;
                 }
                 else
-                {
                     mSkillStatus.insert(SkillStatusMap::value_type(id, SkillStatusData(i, SKILL_NEW)));
-                    if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(id))
-                    {
-                        for (uint8 k = 0; k != 4; ++k)
-                        {
-                            if (data->spell[k])
-                            {
-                                if (!IsInWorld())
-                                    AddSpell(data->spell[k], true, true, true, false, false, true);
-                                else
-                                    LearnSpell(data->spell[k], true, true);
-                            }
-                        }
-                    }
-                }
 
                 // apply skill bonuses
                 SetUInt32Value(PLAYER_SKILL_BONUS_INDEX(i), 0);
@@ -6560,9 +6553,44 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
 
                 // Learn all spells for skill
                 LearnSkillRewardedSpells(id, newVal);
+
+                if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(id))
+                {
+                    for (uint8 k = 0; k != 4; ++k)
+                    {
+                        if (data->spell[k])
+                        {
+                            if (!IsInWorld())
+                                AddSpell(data->spell[k], true, true, true, false, false, true);
+                            else
+                                LearnSpell(data->spell[k], true, true);
+                        }
+                    }
+                }
                 return;
             }
         }
+    }
+
+    // update related stats.
+    switch (id)
+    {
+        case SKILL_SPEC_TIER2_1:
+            UpdateSpeed(MOVE_RUN, true);
+            break;
+        case SKILL_SPEC_TIER1_5:
+            UpdateAllCritPercentages();
+            break;
+        case SKILL_SPEC_TIER2_2:
+            //@todo: update attack/cast speed unit fields
+            _RemoveAllStatBonuses();
+            _ApplyAllStatBonuses();
+            break;
+        case SKILL_SPEC_TIER4_2:
+            UpdateArmor();
+            break;
+        default:
+            break;
     }
 }
 
@@ -9852,7 +9880,7 @@ uint32 Player::GetXPRestBonus(uint32 xp)
 
     SetRestBonus(GetRestBonus() - rested_bonus);
 
-    TC_LOG_DEBUG("entities.player", "Player gain %u xp (+ %u Rested Bonus). Rested points=%f", xp+rested_bonus, rested_bonus, GetRestBonus());
+    TC_LOG_DEBUG("entities.player", "GetXPRestBonus: Player %s (%u) gain %u xp (+%u Rested Bonus). Rested points=%f", GetName().c_str(), GetGUIDLow(), xp+rested_bonus, rested_bonus, GetRestBonus());
     return rested_bonus;
 }
 
@@ -15589,7 +15617,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(quest->GetRewSpellCast());
         if (questGiver->isType(TYPEMASK_UNIT) && !spellInfo->HasEffect(SPELL_EFFECT_LEARN_SPELL) && !spellInfo->HasEffect(SPELL_EFFECT_CREATE_ITEM))
         {
-            if (Creature* creature = GetMap()->GetCreature(questGiver->GetGUID()))
+            if (Creature* creature = questGiver->ToCreature())
                 creature->CastSpell(this, quest->GetRewSpellCast(), true);
         }
         else
@@ -15600,7 +15628,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(quest->GetRewSpell());
         if (questGiver->isType(TYPEMASK_UNIT) && !spellInfo->HasEffect(SPELL_EFFECT_LEARN_SPELL) && !spellInfo->HasEffect(SPELL_EFFECT_CREATE_ITEM))
         {
-            if (Creature* creature = GetMap()->GetCreature(questGiver->GetGUID()))
+            if (Creature* creature = questGiver->ToCreature())
                 creature->CastSpell(this, quest->GetRewSpell(), true);
         }
         else
@@ -22824,7 +22852,7 @@ void Player::UpdateTriggerVisibility()
     WorldPacket packet;
     for (auto itr = m_clientGUIDs.begin(); itr != m_clientGUIDs.end(); ++itr)
     {
-        if (itr->IsCreature())
+        if (itr->IsCreatureOrVehicle())
         {
             Creature* creature = GetMap()->GetCreature(*itr);
             // Update fields of triggers, transformed units or unselectable units (values dependent on GM state)
@@ -25328,6 +25356,20 @@ void Player::_LoadSkills(PreparedQueryResult result)
             mSkillStatus.insert(SkillStatusMap::value_type(skill, SkillStatusData(count, SKILL_UNCHANGED)));
             loadedSkillValues[skill] = value;
 
+            if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(skill))
+            {
+                for (uint8 k = 0; k != 4; ++k)
+                {
+                    if (data->spell[k])
+                    {
+                        if (!IsInWorld())
+                            AddSpell(data->spell[k], true, true, true, false, false, true);
+                        else
+                            LearnSpell(data->spell[k], true, true);
+                    }
+                }
+            }
+
             ++count;
 
             if (count >= PLAYER_MAX_SKILLS)                      // client limit
@@ -27560,4 +27602,20 @@ bool Player::CanLearnSpec(uint32 tier) const
     }
 
     return true;
+}
+
+void Player::UnlearnSpecTier(uint32 tier)
+{
+    SpecSkillDataBounds bound = sObjectMgr->GetSpecSkillDataBounds(tier);
+    if (bound.first == bound.second)
+        return;
+
+    for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
+    {
+        if (HasSkill(itr->second.skill))
+        {
+            SetSkill(itr->second.skill, 0, 0, 0);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(39, sObjectMgr->GetSpecTierName(itr->first).c_str(), itr->second.name.c_str()).c_str());
+        }
+    }
 }

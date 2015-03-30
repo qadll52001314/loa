@@ -864,12 +864,6 @@ class World
 
         //Player Queue
         Queue m_QueuedPlayer;
-
-        // sessions that are added async
-#ifdef _DEBUG
-        LockedQueue<WorldSession*> fakeSessQueue;
-#endif // _DEBUG
-        
         LockedQueue<WorldSession*> addSessQueue;
         void AddSession_(WorldSession* s);
 
