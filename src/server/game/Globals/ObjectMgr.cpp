@@ -9144,14 +9144,18 @@ void ObjectMgr::LoadSpecSkillDataMap()
 
     m_SpecSkillTierMap.clear();
 
-    result = WorldDatabase.Query("SELECT Tier, Name FROM spec_skill_tier");
+    result = WorldDatabase.Query("SELECT Tier, Name, UnlockLevel FROM spec_skill_tier");
 
     if (result)
     {
         do 
         {
+            SpecSkillTier tier;
             Field* fields = result->Fetch();
-            m_SpecSkillTierMap[fields[0].GetUInt32()] = fields[1].GetString();
+            tier.id = fields[0].GetUInt32();
+            tier.name = fields[1].GetString();
+            tier.unlockLevel = fields[2].GetUInt32();
+            m_SpecSkillTierMap[fields[0].GetUInt32()] = tier;
         } while (result->NextRow());
     }
 }
@@ -9185,5 +9189,13 @@ std::string ObjectMgr::GetSpecTierName(uint32 tier)
     SpecSkillTierMap::const_iterator itr = m_SpecSkillTierMap.find(tier);
     if (itr == m_SpecSkillTierMap.end())
         return "";
-    return itr->second;
+    return itr->second.name;
+}
+
+const SpecSkillTier* ObjectMgr::GetSpecSkillTier(uint32 tier) const
+{
+    SpecSkillTierMap::const_iterator itr = m_SpecSkillTierMap.find(tier);
+    if (itr == m_SpecSkillTierMap.end())
+        return NULL;
+    return &itr->second;
 }

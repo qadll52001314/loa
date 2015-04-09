@@ -34,12 +34,9 @@
 #include "InstanceScript.h"
 #include "Log.h"
 #include "LootMgr.h"
-#include "MapManager.h"
 #include "MoveSpline.h"
-#include "MoveSplineInit.h"
 #include "ObjectMgr.h"
 #include "Opcodes.h"
-#include "OutdoorPvPMgr.h"
 #include "Player.h"
 #include "PoolMgr.h"
 #include "QuestDef.h"
@@ -48,11 +45,9 @@
 #include "TemporarySummon.h"
 #include "Util.h"
 #include "Vehicle.h"
-#include "WaypointMovementGenerator.h"
 #include "World.h"
 #include "WorldPacket.h"
 #include "CapitalCityMgr.h"
-
 #include "Transport.h"
 
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
@@ -2189,6 +2184,8 @@ bool Creature::LoadCreaturesAddon(bool reload)
         }
     }
 
+    LoadCustomAuras();
+
     return true;
 }
 
@@ -2304,12 +2301,7 @@ void Creature::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs
             continue;
 
         uint32 unSpellId = m_spells[i];
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(unSpellId);
-        if (!spellInfo)
-        {
-            ASSERT(spellInfo);
-            continue;
-        }
+        SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(unSpellId);
 
         // Not send cooldown for this spells
         if (spellInfo->IsCooldownStartedOnEvent())
@@ -2842,4 +2834,13 @@ bool Creature::IsResearcher() const
             return true;
     }
     return false;
+}
+
+void Creature::LoadCustomAuras()
+{
+    const CreatureTemplate* proto = GetCreatureTemplate();
+    if (proto->WarSchool)
+        AddAura(81623, this);
+    else if (IsResearcher())
+        AddAura(81622, this);
 }

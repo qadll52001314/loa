@@ -683,7 +683,14 @@ struct SpecSkillData
     uint32 description;
 };
 
-typedef std::map<uint32, std::string> SpecSkillTierMap;
+struct SpecSkillTier
+{
+    uint32 id;
+    std::string name;
+    uint32 unlockLevel;
+};
+
+typedef std::map<uint32, SpecSkillTier> SpecSkillTierMap;
 typedef std::multimap<uint32, SpecSkillData> SpecSkillDataMap;
 typedef std::pair<SpecSkillDataMap::const_iterator, SpecSkillDataMap::const_iterator> SpecSkillDataBounds;
 
@@ -1411,6 +1418,7 @@ class ObjectMgr
         SpecSkillDataBounds GetSpecSkillDataBounds(uint32 tier) { return m_SpecSkillDataMap.equal_range(tier); }
         const SpecSkillDataMap* GetSpecSkillDataMap() { return &m_SpecSkillDataMap; }
         const SpecSkillTierMap* GetSpecSkillMap() const { return &m_SpecSkillTierMap; }
+        const SpecSkillTier* GetSpecSkillTier(uint32 tier) const;
     private:
 
         MailLevelRewardContainer _mailLevelRewardStore;

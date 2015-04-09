@@ -446,6 +446,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
 
         bool Create(uint32 guidlow, Map* map, uint32 phaseMask, uint32 entry, float x, float y, float z, float ang, CreatureData const* data = nullptr, uint32 vehId = 0);
         bool LoadCreaturesAddon(bool reload = false);
+        void LoadCustomAuras();
         void SelectLevel();
         void LoadEquipment(int8 id = 1, bool force = false);
 

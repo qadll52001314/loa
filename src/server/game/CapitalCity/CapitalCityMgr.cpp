@@ -866,7 +866,10 @@ void CapitalCityMgr::ResearchUpdate()
                 const CapitalCityResearchData* nextSpell = GetCapitalCityResearchData(itr->second.researchSet, itr->second.rank + 1);
                 {
                     if (!nextSpell) // last research of this spellset
+                    {
                         itr->second.state = CC_RESEARCH_STATE_FINISHED;
+                        itr->second.progress = data->progress; // make progress 100%
+                    }
                     else
                     {
                         itr->second.rank += 1;

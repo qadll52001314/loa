@@ -8,19 +8,15 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
+file(GLOB_RECURSE sources_CommandLine CommandLine/*.cpp CommandLine/*.h)
+file(GLOB_RECURSE sources_RemoteAccess RemoteAccess/*.cpp RemoteAccess/*.h)
+file(GLOB_RECURSE sources_TCSoap TCSoap/*.cpp TCSoap/*.h)
+file(GLOB sources_localdir *.cpp *.h)
+
 if (USE_COREPCH)
   set(worldserver_PCH_HDR PrecompiledHeaders/worldPCH.h)
   set(worldserver_PCH_SRC PrecompiledHeaders/worldPCH.cpp)
 endif()
-
-message(" - Command Line")
-file(GLOB_RECURSE sources_CommandLine CommandLine/*.cpp CommandLine/*.h)
-message(" - Remote Access")
-file(GLOB_RECURSE sources_RemoteAccess RemoteAccess/*.cpp RemoteAccess/*.h)
-message(" - TC SOAP")
-file(GLOB_RECURSE sources_TCSoap TCSoap/*.cpp TCSoap/*.h)
-message(" - World Server")
-file(GLOB sources_localdir *.cpp *.h)
 
 set(worldserver_SRCS
   ${worldserver_SRCS}

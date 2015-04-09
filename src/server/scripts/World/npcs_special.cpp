@@ -2392,6 +2392,13 @@ enum NpcShilvasaExatierGossip
     GOSSIP_ACTION_SPEC_UNLEARN_TIER3 = 1010,
     GOSSIP_ACTION_SPEC_UNLEARN_TIER4 = 1011,
     GOSSIP_ACTION_SPEC_UNLEARN_TIER5 = 1012,
+    GOSSIP_ACTION_QUEST_GOSSIP_0 = 1013,
+    GOSSIP_ACTION_QUEST_GOSSIP_1 = 1014,
+    GOSSIP_ACTION_QUEST_GOSSIP_2 = 1015,
+    GOSSIP_ACTION_QUEST_GOSSIP_3 = 1016,
+    GOSSIP_ACTION_QUEST_GOSSIP_4 = 1017,
+    GOSSIP_ACTION_QUEST_GOSSIP_5 = 1018,
+    GOSSIP_ACTION_QUEST_GOSSIP_6 = 1019,
     GOSSIP_ACTION_VIEW_SPEC_LIST = 2000,
     GOSSIP_ACTION_SPEC_TIER1_START = 3000,
     GOSSIP_ACTION_SPEC_TIER2_START = 4000,
@@ -2409,7 +2416,13 @@ public:
 
     bool OnGossipHello(Player* player, Creature* creature) override
     {
-        BuildSpecList(player, creature);
+        player->PlayerTalkClass->ClearMenus();
+        player->PrepareQuestMenu(creature->GetGUID());
+        if (player->GetQuestStatus(26083) == QUEST_STATUS_REWARDED)
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(40), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST);
+        else if (player->GetQuestStatus(26083) == QUEST_STATUS_INCOMPLETE)
+            player->ADD_GOSSIP_ITEM_DB(55103, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_0);
+        player->SEND_GOSSIP_MENU(31176, creature->GetGUID());
         return true;
     }
 
@@ -2419,6 +2432,39 @@ public:
         {
             switch (action)
             {
+                case GOSSIP_ACTION_QUEST_GOSSIP_0:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55104, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_1);
+                    player->SEND_GOSSIP_MENU(31177, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_1:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55105, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_2);
+                    player->SEND_GOSSIP_MENU(31178, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_2:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55106, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_3);
+                    player->SEND_GOSSIP_MENU(31179, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_3:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55107, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_4);
+                    player->SEND_GOSSIP_MENU(31180, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_4:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55108, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_5);
+                    player->SEND_GOSSIP_MENU(31181, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_5:
+                    player->PlayerTalkClass->ClearMenus();
+                    player->ADD_GOSSIP_ITEM_DB(55109, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_6);
+                    player->SEND_GOSSIP_MENU(31182, creature->GetGUID());
+                    break;
+                case GOSSIP_ACTION_QUEST_GOSSIP_6:
+                    BuildSpecList(player, creature);
+                    break;
                 case GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST:
                     BuildSpecList(player, creature);
                     break;
@@ -2496,6 +2542,8 @@ public:
             uint32 skill = action - GOSSIP_ACTION_SPEC_LEARN_START;
             // learn skill
             player->SetSkill(skill, 1, 1, 100);
+            if (player->GetQuestStatus(26083) == QUEST_STATUS_INCOMPLETE)
+                player->CompleteQuest(26083);
             player->CLOSE_GOSSIP_MENU();
         }
 
@@ -2507,7 +2555,7 @@ public:
         player->PlayerTalkClass->ClearMenus();
         const SpecSkillTierMap* list = sObjectMgr->GetSpecSkillMap();
         for (SpecSkillTierMap::const_iterator itr = list->begin(); itr != list->end(); ++itr)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_VIEW_SPEC_LIST + itr->first);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second.name, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_VIEW_SPEC_LIST + itr->first);
         player->SEND_GOSSIP_MENU(31152, creature->GetGUID());
     }
 
@@ -2554,7 +2602,7 @@ public:
 
         for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
             player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second.name, GOSSIP_SENDER_MAIN, action + itr->second.id);
-        if (!player->CanLearnSpec(tier))
+        if (player->HasSpecSkill(tier))
             player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(37, sObjectMgr->GetSpecTierName(tier).c_str()), GOSSIP_SENDER_MAIN, unlearn, sObjectMgr->GetServerMessage(38, sObjectMgr->GetSpecTierName(tier).c_str()), 0, false);
         player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST);
         player->SEND_GOSSIP_MENU(text, creature->GetGUID());
@@ -2588,7 +2636,7 @@ public:
                     break;
             }
             if (player->CanLearnSpec(tier))
-                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(35), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_LEARN_START + data->skill, sObjectMgr->GetServerMessage(36, sObjectMgr->GetSpecTierName(tier).c_str(), data->name.c_str()), 0, false);
+                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(35), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_LEARN_START + data->skill, sObjectMgr->GetServerMessage(36, sObjectMgr->GetSpecTierName(tier).c_str(), data->name.c_str()), 0, false);
             player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, nav);
             player->SEND_GOSSIP_MENU(data->description, creature->GetGUID());
         }

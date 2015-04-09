@@ -1514,6 +1514,7 @@ class Player : public Unit, public GridObject<Player>
         static bool   LoadPositionFromDB(uint32& mapid, float& x, float& y, float& z, float& o, bool& in_flight, ObjectGuid guid);
 
         static bool IsValidGender(uint8 Gender) { return Gender <= GENDER_FEMALE; }
+        static bool ValidateAppearance(uint8 race, uint8 class_, uint8 gender, uint8 hairID, uint8 hairColor, uint8 faceID, uint8 facialHair, uint8 skinColor, bool create = false);
 
         /*********************************************************/
         /***                   SAVE SYSTEM                     ***/
@@ -2379,6 +2380,8 @@ class Player : public Unit, public GridObject<Player>
         float GetPrimaryStat() const;
         float GetSecondaryStat() const;
         bool CanLearnSpec(uint32 tier) const;
+        bool HasSpecSkill(uint32 tier) const;
+        bool ReachedSpecLevel(uint32 tier) const;
         void UnlearnSpecTier(uint32 tier);
     private:
         uint32 m_SupremacyStats[MAX_STATS];
