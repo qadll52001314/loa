@@ -846,6 +846,18 @@ enum PlayerDelayedOperations
     DELAYED_END
 };
 
+enum ResourceRecycleQuest
+{
+    RECYCLE_QUEST_OGRIMMAR = 26089,
+    RECYCLE_QUEST_STORMWIND = 26090,
+    RECYCLE_QUEST_IRONFORGE = 26091,
+    RECYCLE_QUEST_DARNASSUS = 26092,
+    RECYCLE_QUEST_EXODAR = 26093,
+    RECYCLE_QUEST_THUNDERBLUFF = 26094,
+    RECYCLE_QUEST_UNDERCITY = 26095,
+    RECYCLE_QUEST_SILVERMOON = 26096
+};
+
 // Player summoning auto-decline time (in secs)
 #define MAX_PLAYER_SUMMON_DELAY                   (2*MINUTE)
 // Maximum money amount : 2^31 - 1
@@ -1097,6 +1109,8 @@ private:
     bool _isPvP;
 };
 
+typedef std::set<int32> CollectedMemorySet;
+
 class Player : public Unit, public GridObject<Player>
 {
     friend class WorldSession;
@@ -1105,6 +1119,10 @@ class Player : public Unit, public GridObject<Player>
     public:
         explicit Player(WorldSession* session);
         ~Player();
+
+        bool CanSeeOrDetectEx(WorldObject const* obj, bool ignoreStealth = false, bool distanceCheck = false) const;
+        bool MemoryCollected(int32 entry) const;
+        void SaveCollectedMemory(int32 memory);
 
         void CleanupsBeforeDelete(bool finalCleanup = true) override;
 
@@ -2151,7 +2169,7 @@ class Player : public Unit, public GridObject<Player>
         void SetFallInformation(uint32 time, float z);
         void HandleFall(MovementInfo const& movementInfo);
 
-        bool IsKnowHowFlyIn(uint32 mapid, uint32 zone) const;
+        bool CanFlyInZone(uint32 mapid, uint32 zone) const;
 
         void SetClientControl(Unit* target, bool allowMove);
 
@@ -2206,7 +2224,7 @@ class Player : public Unit, public GridObject<Player>
         uint8 m_forced_speed_changes[MAX_MOVE_TYPE];
 
         bool HasAtLoginFlag(AtLoginFlags f) const { return (m_atLoginFlags & f) != 0; }
-        void SetAtLoginFlag(AtLoginFlags f) { m_atLoginFlags |= f; }
+        void SetAtLoginFlag(uint16 f) { m_atLoginFlags |= f; }
         void RemoveAtLoginFlag(AtLoginFlags flags, bool persist = false);
 
         bool isUsingLfg();
@@ -2390,19 +2408,14 @@ class Player : public Unit, public GridObject<Player>
         uint8 m_SecondaryStat;
 
         /*********************************************************/
-        /***                  LEGACY ITEM                      ***/
-        /*********************************************************/
-
-    public:
-        void SendLegacyMails();
-        Mail* GenerateLegacyMails();
-        void UpdateLegacyItemRecord(int item);
-
-        /*********************************************************/
         /***                  LEGACY MISC                      ***/
         /*********************************************************/
     public:
         uint32 GetCapitalCityLevel();
+        SpellFamilyNames GetSpellFamilyName() const;
+        void TryCompound();
+        Item* GetCompoundContainer() const;
+        uint32 GetAccountMemoryCount(uint32 memory) const;
 
         /*********************************************************/
         /***                  CAPITAL CITY                     ***/
@@ -2415,7 +2428,6 @@ class Player : public Unit, public GridObject<Player>
         void SendResearchProgressState(const CapitalCityNpcResearchState* state);
         void SendFirstRankResearchState(const CapitalCityResearchData* data);
         void StartResearch(Creature* researcher, uint8 index);
-
 
     protected:
         // Gamemaster whisper whitelist
@@ -2490,6 +2502,7 @@ class Player : public Unit, public GridObject<Player>
         void _LoadTalents(PreparedQueryResult result);
         void _LoadInstanceTimeRestrictions(PreparedQueryResult result);
         void _LoadSupremacyStats(uint32 guid);
+        void _LoadCollectedMemory(uint32 guid);
 
         /*********************************************************/
         /***                   SAVE SYSTEM                     ***/
@@ -2751,6 +2764,8 @@ class Player : public Unit, public GridObject<Player>
         uint32 _pendingBindTimer;
 
         uint32 _activeCheats;
+
+        CollectedMemorySet m_CollectedMemorySet;
 };
 
 void AddItemsSetItem(Player* player, Item* item);

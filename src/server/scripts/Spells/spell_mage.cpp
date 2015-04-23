@@ -677,6 +677,37 @@ public:
     }
 };
 
+// 81727
+class spell_mage_icy_ignition : public SpellScriptLoader
+{
+public:
+    spell_mage_icy_ignition() : SpellScriptLoader("spell_mage_icy_ignition") { }
+
+    class spell_mage_icy_ignition_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_mage_icy_ignition_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            if (aurEff->GetBase()->GetStackAmount() == 5)
+            {
+                aurEff->GetBase()->Remove();
+                GetCaster()->CastSpell(GetCaster(), 81727, true);
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_mage_icy_ignition_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_mage_icy_ignition_AuraScript();
+    }
+};
+
 void AddSC_mage_spell_scripts()
 {
     new spell_mage_blast_wave();
@@ -692,4 +723,5 @@ void AddSC_mage_spell_scripts()
     new spell_mage_polymorph_cast_visual();
     new spell_mage_summon_water_elemental();
     new spell_mage_magic_disciple();
+    new spell_mage_icy_ignition();
 }

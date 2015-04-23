@@ -355,6 +355,8 @@ class Spell
         void EffectGrantBaseSpellSet(SpellEffIndex effIndex);
         void EffectGrantCityResource(SpellEffIndex effIndex);
         void EffectGrantCityMagicPower(SpellEffIndex effIndex);
+        void EffectModifySpellCooldown(SpellEffIndex effIndex);
+        void EffectModifyAppliedAuraDuration(SpellEffIndex effIndex);
 
         typedef std::set<Aura*> UsedSpellMods;
 

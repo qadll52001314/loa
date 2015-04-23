@@ -839,7 +839,9 @@ enum SpellEffects
     SPELL_EFFECT_GRANT_BASE_SPELLSET                = 168,
     SPELL_EFFECT_GRANT_CITY_GOODS                   = 169,
     SPELL_EFFECT_GRANT_CITY_MAGICS                  = 170,
-    TOTAL_SPELL_EFFECTS                             = 171
+    SPELL_EFFECT_MODIFY_SPELL_COOLDOWN              = 171,
+    SPELL_EFFECT_MODIFY_APPLIED_AURA_DURATION       = 172,
+    TOTAL_SPELL_EFFECTS                             = 173
 };
 
 enum SpellCastResult

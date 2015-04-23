@@ -67,6 +67,8 @@
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
 #include "WarSchool.h"
+#include "Compounding.h"
+#include "MemoryMgr.h"
 
 std::atomic<bool> World::m_stopEvent(false);
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -1379,7 +1381,17 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Loading Server Messages...");
     sObjectMgr->LoadServerMesssages();
 
+    TC_LOG_INFO("server.loading", "Loading Specialization Skill Map...");
     sObjectMgr->LoadSpecSkillDataMap();
+
+    TC_LOG_INFO("server.loading", "Loading Memory Collection Map...");
+    sObjectMgr->LoadMemoryCollector();
+
+    TC_LOG_INFO("server.loading", "Loading Compounding List...");
+    xCompoundingMgr->Load();
+
+    TC_LOG_INFO("server.loading", "Loading Memory Define...");
+    xMemoryMgr->LoadDefine();
 
     ///- Update the realm entry in the database with the realm type from the config file
     //No SQL injection as values are treated as integers
@@ -1809,7 +1821,7 @@ void World::SetInitialWorldSettings()
 
     m_timers[WUPDATE_PINGDB].SetInterval(getIntConfig(CONFIG_DB_PING_INTERVAL)*MINUTE*IN_MILLISECONDS);    // Mysql ping time in minutes
 
-    m_timers[WUPDATE_CAPITALCITY].SetInterval(3*IN_MILLISECONDS);
+    m_timers[WUPDATE_CAPITALCITY].SetInterval(15*IN_MILLISECONDS*MINUTE);
     m_timers[WUPDATE_CC_RESEARCH].SetInterval(IN_MILLISECONDS*MINUTE);
 
     //to set mailtimer to return mails every day between 4 and 5 am

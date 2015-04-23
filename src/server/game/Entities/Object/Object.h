@@ -61,6 +61,7 @@ enum TempSummonType
 enum PhaseMasks
 {
     PHASEMASK_NORMAL   = 0x00000001,
+    PHASEMASK_MEMORY   = 0x40000000,
     PHASEMASK_ANYWHERE = 0xFFFFFFFF
 };
 

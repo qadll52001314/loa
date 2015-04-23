@@ -20,6 +20,7 @@ file(GLOB_RECURSE sources_Calendar Calendar/*.cpp Calendar/*.h)
 file(GLOB_RECURSE sources_CapitalCity CapitalCity/*.cpp CapitalCity/*.h)
 file(GLOB_RECURSE sources_Chat Chat/*.cpp Chat/*.h)
 file(GLOB_RECURSE sources_Combat Combat/*.cpp Combat/*.h)
+file(GLOB_RECURSE sources_Compounding Compounding/*.cpp Compounding/*.h)
 file(GLOB_RECURSE sources_Conditions Conditions/*.cpp Conditions/*.h)
 file(GLOB_RECURSE sources_DataStores DataStores/*.cpp DataStores/*.h)
 file(GLOB_RECURSE sources_DungeonFinding DungeonFinding/*.cpp DungeonFinding/*.h)
@@ -34,6 +35,7 @@ file(GLOB_RECURSE sources_Instances Instances/*.cpp Instances/*.h)
 file(GLOB_RECURSE sources_Loot Loot/*.cpp Loot/*.h)
 file(GLOB_RECURSE sources_Mails Mails/*.cpp Mails/*.h)
 file(GLOB_RECURSE sources_Maps Maps/*.cpp Maps/*.h)
+file(GLOB_RECURSE sources_Memory Memory/*.cpp Memory/*.h)
 file(GLOB_RECURSE sources_Miscellaneous Miscellaneous/*.cpp Miscellaneous/*.h)
 file(GLOB_RECURSE sources_Movement Movement/*.cpp Movement/*.h)
 file(GLOB_RECURSE sources_OutdoorPvP OutdoorPvP/*.cpp OutdoorPvP/*.h)
@@ -76,6 +78,7 @@ set(game_STAT_SRCS
   ${sources_CapitalCity}
   ${sources_Chat}
   ${sources_Combat}
+  ${sources_Compounding}
   ${sources_Conditions}
   ${sources_DataStores}
   ${sources_DungeonFinding}
@@ -90,6 +93,7 @@ set(game_STAT_SRCS
   ${sources_Loot}
   ${sources_Mails}
   ${sources_Maps}
+  ${sources_Memory}
   ${sources_Miscellaneous}
   ${sources_Movement}
   ${sources_OutdoorPvP}
@@ -160,6 +164,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Chat
   ${CMAKE_CURRENT_SOURCE_DIR}/Chat/Channels
   ${CMAKE_CURRENT_SOURCE_DIR}/Combat
+  ${CMAKE_CURRENT_SOURCE_DIR}/Compounding
   ${CMAKE_CURRENT_SOURCE_DIR}/Conditions
   ${CMAKE_CURRENT_SOURCE_DIR}/DataStores
   ${CMAKE_CURRENT_SOURCE_DIR}/DungeonFinding
@@ -190,6 +195,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Loot
   ${CMAKE_CURRENT_SOURCE_DIR}/Mails
   ${CMAKE_CURRENT_SOURCE_DIR}/Maps
+  ${CMAKE_CURRENT_SOURCE_DIR}/Memory
   ${CMAKE_CURRENT_SOURCE_DIR}/Miscellaneous
   ${CMAKE_CURRENT_SOURCE_DIR}/Movement
   ${CMAKE_CURRENT_SOURCE_DIR}/Movement/Spline

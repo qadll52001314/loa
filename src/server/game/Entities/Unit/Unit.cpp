@@ -733,7 +733,7 @@ uint32 Unit::DealDamage(Unit* victim, uint32 damage, CleanDamage const* cleanDam
     {
         TC_LOG_DEBUG("entities.unit", "DealDamage: Damage above victim's health");
 
-        Player* player = ToPlayer();
+        Player* playerVictim = victim->ToPlayer();
 
         if (victim->GetTypeId() == TYPEID_PLAYER && victim != this)
             victim->ToPlayer()->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_TOTAL_DAMAGE_RECEIVED, health);
@@ -742,11 +742,17 @@ uint32 Unit::DealDamage(Unit* victim, uint32 damage, CleanDamage const* cleanDam
         {
             // no special handling
         }
-        else if (player && player->HasSkill(SKILL_SPEC_TIER4_10) && !player->HasSpellCooldown(81453))
+        else if (playerVictim && GetTypeId() == TYPEID_UNIT && playerVictim->HasAura(81884) && !playerVictim->HasSpellCooldown(81884))
         {
-            player->AddSpellCooldown(81453, 0, time(NULL) + 120);
-            int32 damage = CountPctFromMaxHealth(50 + 0.5 * player->GetSkillValue(SKILL_SPEC_TIER4_10));
-            player->CastCustomSpell(player, 81616, &damage, NULL, NULL, true);
+            damage = 0;
+            playerVictim->AddSpellCooldown(81884, 0, time(NULL) + 600);
+            playerVictim->CastSpell(playerVictim, 81885, true);
+        }
+        else if (playerVictim && playerVictim->HasSkill(SKILL_SPEC_TIER4_10) && !playerVictim->HasSpellCooldown(81453))
+        {
+            playerVictim->AddSpellCooldown(81453, 0, time(NULL) + 120);
+            int32 damage = CountPctFromMaxHealth(50 + 0.5 * playerVictim->GetSkillValue(SKILL_SPEC_TIER4_10));
+            playerVictim->CastCustomSpell(playerVictim, 81616, &damage, NULL, NULL, true);
         }
         else if (Aura* aura = victim->GetAura(SPELL_SUNRAGE_PASSIVE)) // Sunrage(item 57339) effect, cant handle in spellscript
         {
@@ -6060,7 +6066,7 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
                 case 55677:
                 {
                     // Dispel Magic shares spellfamilyflag with abolish disease
-                    if (procSpell->SpellIconID != 74)
+                    if (!procSpell || procSpell->SpellIconID != 74)
                         return false;
                     if (!target || !target->IsFriendlyTo(this))
                         return false;
@@ -11985,6 +11991,8 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
 
     SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IN_COMBAT);
 
+    UpdateSpeed(MOVE_RUN, true);
+
     if (Creature* creature = ToCreature())
     {
         // Set home position at place of engaging combat for escorted creatures
@@ -12006,7 +12014,6 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
 
         if (IsPet())
         {
-            UpdateSpeed(MOVE_RUN, true);
             UpdateSpeed(MOVE_SWIM, true);
             UpdateSpeed(MOVE_FLIGHT, true);
         }
@@ -12037,6 +12044,8 @@ void Unit::ClearInCombat()
         }
     }
 
+    UpdateSpeed(MOVE_RUN, true);
+
     // Player's state will be cleared in Player::UpdateContestedPvP
     if (Creature* creature = ToCreature())
     {
@@ -12047,7 +12056,7 @@ void Unit::ClearInCombat()
         if (HasFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_TAPPED))
             SetUInt32Value(UNIT_DYNAMIC_FLAGS, creature->GetCreatureTemplate()->dynamicflags);
 
-        if (creature->IsPet())
+        if (creature->IsPet() || creature->IsGuardian())
         {
             if (Unit* owner = GetOwner())
                 for (uint8 i = 0; i < MAX_MOVE_TYPE; ++i)
@@ -12466,6 +12475,8 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced)
                 main_speed_mod  = GetMaxPositiveAuraModifier(SPELL_AURA_MOD_INCREASE_MOUNTED_SPEED);
                 stack_bonus     = GetTotalAuraMultiplier(SPELL_AURA_MOD_MOUNTED_SPEED_ALWAYS);
                 non_stack_bonus += GetMaxPositiveAuraModifier(SPELL_AURA_MOD_MOUNTED_SPEED_NOT_STACK) / 100.0f;
+                if (!IsInCombat() && HasAura(81889))
+                    main_speed_mod += 50.0f;
             }
             else
             {
@@ -12477,8 +12488,11 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced)
                     if (player->HasSkill(SKILL_SPEC_TIER2_1))
                         main_speed_mod += 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER2_1);
                     if (player->HasSkill(SKILL_SPEC_TIER2_6))
-                        main_speed_mod += (3.0f + 0.03f * player->GetSkillValue(SKILL_SPEC_TIER2_6)) * (100.0f - player->GetHealthPct());
+                        main_speed_mod += (0.3f + 0.003f * player->GetSkillValue(SKILL_SPEC_TIER2_6)) * (100.0f - player->GetHealthPct());
                 }
+
+                if (!IsInCombat() && HasAura(81888))
+                    main_speed_mod += 30.0f;
             }
             break;
         }
@@ -13193,11 +13207,32 @@ void Unit::ModSpellCastTime(SpellInfo const* spellInfo, int32 & castTime, Spell*
     if (Player* modOwner = GetSpellModOwner())
         modOwner->ApplySpellMod(spellInfo->Id, SPELLMOD_CASTING_TIME, castTime, spell);
 
-    if (!(spellInfo->HasAttribute(SPELL_ATTR0_ABILITY) || spellInfo->HasAttribute(SPELL_ATTR0_TRADESPELL) || spellInfo->HasAttribute(SPELL_ATTR0_TRADESPELL) || spellInfo->HasAttribute(SPELL_ATTR3_NO_DONE_BONUS)) &&
+    if (!(spellInfo->HasAttribute(SPELL_ATTR0_ABILITY) || spellInfo->HasAttribute(SPELL_ATTR0_TRADESPELL) || spellInfo->HasAttribute(SPELL_ATTR3_NO_DONE_BONUS)) &&
         ((GetTypeId() == TYPEID_PLAYER && spellInfo->SpellFamilyName) || GetTypeId() == TYPEID_UNIT))
         castTime = int32(float(castTime) * GetFloatValue(UNIT_MOD_CAST_SPEED));
     else if (spellInfo->HasAttribute(SPELL_ATTR0_REQ_AMMO) && !spellInfo->HasAttribute(SPELL_ATTR2_AUTOREPEAT_FLAG))
         castTime = int32(float(castTime) * m_modAttackSpeedPct[RANGED_ATTACK]);
+    else if (spellInfo->HasAttribute(SPELL_ATTR0_TRADESPELL))
+    {
+        if (HasAura(81870))
+            castTime *= 0.6f;
+        else if (HasAura(81869))
+            castTime *= 0.64f;
+        else if (HasAura(81868))
+            castTime *= 0.68f;
+        else if (HasAura(81867))
+            castTime *= 0.72f;
+        else if (HasAura(81866))
+            castTime *= 0.76f;
+        else if (HasAura(81865))
+            castTime *= 0.8f;
+        else if (HasAura(81864))
+            castTime *= 0.84f;
+        else if (HasAura(81863))
+            castTime *= 0.88f;
+        else if (HasAura(81862))
+            castTime *= 0.92f;
+    }
         
     else if (spellInfo->SpellVisual[0] == 3881 && HasAura(67556)) // cooking with Chef Hat.
         castTime = 500;
@@ -14466,7 +14501,6 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
         uint32 Id = i->aura->GetId();
 
         AuraApplication* aurApp = i->aura->GetApplicationOfTarget(GetGUID());
-        ASSERT(aurApp);
 
         bool prepare = i->aura->CallScriptPrepareProcHandlers(aurApp, eventInfo);
 

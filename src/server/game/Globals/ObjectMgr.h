@@ -690,12 +690,24 @@ struct SpecSkillTier
     uint32 unlockLevel;
 };
 
+struct MemoryCollector
+{
+    int32 entry;
+    uint32 reqItem;
+    uint32 count;
+    uint32 spell;
+    uint32 item;
+    uint32 text;
+};
+
 typedef std::map<uint32, SpecSkillTier> SpecSkillTierMap;
 typedef std::multimap<uint32, SpecSkillData> SpecSkillDataMap;
 typedef std::pair<SpecSkillDataMap::const_iterator, SpecSkillDataMap::const_iterator> SpecSkillDataBounds;
 
 typedef std::list<DungeonEncounter const*> DungeonEncounterList;
 typedef std::unordered_map<uint32, DungeonEncounterList> DungeonEncounterContainer;
+
+typedef std::map<int32, MemoryCollector> MemoryCollectorMap;
 
 class PlayerDumpReader;
 
@@ -1419,7 +1431,11 @@ class ObjectMgr
         const SpecSkillDataMap* GetSpecSkillDataMap() { return &m_SpecSkillDataMap; }
         const SpecSkillTierMap* GetSpecSkillMap() const { return &m_SpecSkillTierMap; }
         const SpecSkillTier* GetSpecSkillTier(uint32 tier) const;
+        const MemoryCollector* GetMemoryCollector(int32 entry) const;
+        void LoadMemoryCollector();
+        bool IsMemoryCollector(int32 entry) const;
     private:
+        MemoryCollectorMap m_MemoryCollectorMap;
 
         MailLevelRewardContainer _mailLevelRewardStore;
 

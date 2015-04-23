@@ -697,3 +697,60 @@ bool LinkExtractor::IsValidMessage()
 
     return true;
 }
+
+// |color|Hitem:item_id:perm_ench_id:gem1:gem2:gem3:0:0:0:0:reporter_level|h[name]|h|r
+
+std::string ItemChatLink::FormatName(uint32 entry)
+{
+    const ItemTemplate* proto = sObjectMgr->GetItemTemplate(entry);
+    if (!proto)
+        return "<invalid item entry>";
+
+    std::string color = "";
+    switch (proto->Quality)
+    {
+        case ITEM_QUALITY_POOR:
+            color = "9d9d9d";
+            break;
+        case ITEM_QUALITY_NORMAL:
+            color = "ffffff";
+            break;
+        case ITEM_QUALITY_UNCOMMON:
+            color = "1eff00";
+            break;
+        case ITEM_QUALITY_RARE:
+            color = "0070dd";
+            break;
+        case ITEM_QUALITY_EPIC:
+            color = "a335ee";
+            break;
+        case ITEM_QUALITY_LEGENDARY:
+            color = "ff8000";
+            break;
+        case ITEM_QUALITY_ARTIFACT:
+            color = "e6cc80";
+            break;
+        case ITEM_QUALITY_HEIRLOOM:
+            color = "e6cc80";
+            break;
+    }
+
+    std::string id = "";
+    std::stringstream ss;
+    ss << entry;
+    id = ss.str();
+    return "|cff" + color + "|Hitem:" + id + ":0:0:0:0:0:0:0:0:0|h[" + proto->Name1 + "]|h|r";
+}
+
+// |color|Hspell:spell_id|h[name]|h|r                                     - client, spellbook spell icon shift-click
+std::string SpellChatLink::FormatName(uint32 entry)
+{
+    const SpellInfo* info = sSpellMgr->GetSpellInfo(entry);
+    if (!info)
+        return "<invalid spell id>";
+    std::string id = "";
+    std::stringstream ss;
+    ss << entry;
+    id = ss.str();
+    return "|cffffffff|Hspell:" + id + "|h[" + info->SpellName[sObjectMgr->GetDBCLocaleIndex()] + "]|h|r";
+}

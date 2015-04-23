@@ -9199,3 +9199,38 @@ const SpecSkillTier* ObjectMgr::GetSpecSkillTier(uint32 tier) const
         return NULL;
     return &itr->second;
 }
+
+const MemoryCollector* ObjectMgr::GetMemoryCollector(int32 entry) const
+{
+    MemoryCollectorMap::const_iterator itr = m_MemoryCollectorMap.find(entry);
+    if (itr != m_MemoryCollectorMap.end())
+        return &itr->second;
+    return NULL;
+}
+
+void ObjectMgr::LoadMemoryCollector()
+{
+    m_MemoryCollectorMap.clear();
+    QueryResult result = WorldDatabase.Query("SELECT Entry, Item, ItemCount, RewardItem, RewardSpell, Text FROM memory_collection");
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            MemoryCollector memory;
+            memory.entry = fields[0].GetInt32();
+            memory.reqItem = fields[1].GetUInt32();
+            memory.count = fields[2].GetUInt32();
+            memory.item = fields[3].GetUInt32();
+            memory.spell = fields[4].GetUInt32();
+            memory.text = fields[5].GetUInt32();
+            m_MemoryCollectorMap.insert(std::pair<int32, MemoryCollector>(memory.entry, memory));
+        } while (result->NextRow());
+    }
+}
+
+bool ObjectMgr::IsMemoryCollector(int32 entry) const
+{
+    MemoryCollectorMap::const_iterator itr = m_MemoryCollectorMap.find(entry);
+    return itr != m_MemoryCollectorMap.end();
+}

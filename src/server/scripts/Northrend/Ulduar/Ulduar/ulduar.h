@@ -413,6 +413,14 @@ enum YoggSaronIllusions
     STORMWIND_ILLUSION          = 2,
 };
 
+enum LegacyEventCreatures
+{
+    LEGACY_MIMIRON = 43306,
+    LEGACY_THORIM = 43308,
+    LEGACY_FREYA = 43307,
+    LEGACY_HODIR = 43305
+};
+
 template<class AI, class T>
 AI* GetUlduarAI(T* obj)
 {

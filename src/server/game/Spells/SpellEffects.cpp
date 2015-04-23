@@ -228,6 +228,8 @@ pEffect SpellEffects[TOTAL_SPELL_EFFECTS]=
     &Spell::EffectGrantBaseSpellSet,                        //168 SPELL_EFFECT_GRANT_BASE_SPELLSET
     &Spell::EffectGrantCityResource,                        //169 SPELL_EFFECT_GRANT_CITY_GOODS
     &Spell::EffectGrantCityMagicPower,                      //170 SPELL_EFFECT_GRANT_CITY_MAGICS
+    &Spell::EffectModifySpellCooldown,
+    &Spell::EffectModifyAppliedAuraDuration,
 };
 
 void Spell::EffectNULL(SpellEffIndex /*effIndex*/)
@@ -6267,5 +6269,66 @@ void Spell::EffectGrantCityMagicPower(SpellEffIndex effIndex)
         }
         draft.SendMailTo(trans, player, MailSender(MAIL_CREATURE, player->GetTeamId() ? WAR_MAIL_SENDER_HORDE : WAR_MAIL_SENDER_ALLIANCE));
         CharacterDatabase.CommitTransaction(trans);
+    }
+}
+
+void Spell::EffectModifySpellCooldown(SpellEffIndex effIndex)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
+        return;
+
+    if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
+        return;
+
+    Player* player = unitTarget->ToPlayer();
+
+    const SpellInfo* spell = GetSpellInfo();
+    //if (spell->SpellFamilyName != player->GetSpellFamilyName())
+    //    return;
+
+    const SpellCooldowns& cm = player->GetSpellCooldownMap();
+    for (SpellCooldowns::const_iterator itr = cm.begin(); itr != cm.end();)
+    {
+        SpellInfo const* spell2 = sSpellMgr->EnsureSpellInfo(itr->first);
+
+        if (spell2->SpellFamilyName == spell->SpellFamilyName &&
+            (spell2->SpellFamilyFlags & spell->SpellFamilyFlags))
+        {
+            player->ModifySpellCooldown((itr++)->first, m_damage);
+        }
+        else
+            ++itr;
+    }
+}
+
+void Spell::EffectModifyAppliedAuraDuration(SpellEffIndex effIndex)
+{
+    if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
+        return;
+
+    if (!unitTarget)
+        return;
+
+    const SpellInfo* spell = GetSpellInfo();
+
+    bool fromCaster = spell->Effects[effIndex].MiscValue == 1;
+
+    Unit::AuraApplicationMap const& auras = unitTarget->GetAppliedAuras();
+    for (Unit::AuraApplicationMap::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
+    {
+        if (Aura* aura = itr->second->GetBase())
+        {
+            if (fromCaster && aura->GetCasterGUID() != m_originalCasterGUID)
+                continue;
+            SpellInfo const* auraInfo = aura->GetSpellInfo();
+            int32 duration = m_damage ? std::max(aura->GetDuration() + m_damage, aura->GetMaxDuration()) : aura->GetMaxDuration();
+            if (spell->SpellFamilyName == auraInfo->SpellFamilyName && spell->SpellFamilyFlags & auraInfo->SpellFamilyFlags)
+            {
+                if (duration < 0)
+                    aura->Remove();
+                else
+                    aura->SetDuration(duration);
+            }
+        }
     }
 }

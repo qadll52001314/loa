@@ -45,6 +45,7 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "MemoryMgr.h"
 
 
 class LoginQueryHolder : public SQLQueryHolder
@@ -992,6 +993,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     _player->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ON_LOGIN, 1);
 
     sScriptMgr->OnPlayerLogin(pCurrChar, firstLogin);
+
+    xMemoryMgr->CollectMemory(pCurrChar);
 
     delete holder;
 }

@@ -620,6 +620,12 @@ void CharacterDatabaseConnection::DoPrepareStatements()
     PrepareStatement(CHAR_REP_SUPREMACY_STATS, "REPLACE INTO character_supremacy (guid, strength, agility, stamina, intellect, spirit) VALUES(?,?,?,?,?,?)", CONNECTION_ASYNC);
     PrepareStatement(CHAR_SEL_SUPREMACY_STATS, "SELECT strength, agility, stamina, intellect, spirit FROM character_supremacy WHERE guid = ?", CONNECTION_SYNCH);
 
+    PrepareStatement(CHAR_SEL_COLLECTED_MEMORY, "SELECT Entry FROM character_collected_memory WHERE Guid = ?", CONNECTION_SYNCH);
+    PrepareStatement(CHAR_REP_COLLECTED_MEMORY, "REPLACE INTO character_collected_memory (Guid, Entry) VALUES (?, ?)", CONNECTION_ASYNC);
+
+    PrepareStatement(CHAR_REP_COLLECTABLE_MEMORY, "REPLACE INTO character_collectable_memory (Guid, Memory, Collected) VALUES (?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(CHAR_UPD_MEMORY_CODE, "UPDATE memory_code SET Memory = ?, MemoryLeft = ? WHERE Code = ?", CONNECTION_ASYNC);
+
     PrepareStatement(CHAR_UPD_CAPITAL_CITY_RESEARCH_STATE, "REPLACE INTO capital_city_research_state (Entry, ResearchSet, Rank, State, Progress, ItemCount1, ItemCount2, ItemCount3, ItemCount4) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", CONNECTION_ASYNC);
 
 }

@@ -35,7 +35,7 @@ void CapitalCity::SendAllState(Player* player)
     xCapitalCityMgr->SendStateTo(player, WORLDSTATE_CAPITAL_CITY_RESOURCE, m_Resource);
 	xCapitalCityMgr->SendStateTo(player, WORLDSTATE_CAPITAL_CITY_MAGICPOWER, m_MagicPower);
     xCapitalCityMgr->SendStateTo(player, WORLDSTATE_CC_UPGRADE_RESOURCE_PROGRESS, m_UpgradeResource * 100 / xCapitalCityMgr->ResourceToNextLevel(m_Rank));
-    xCapitalCityMgr->SendStateTo(player, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS, m_UpgradeMagicPower * 100 / xCapitalCityMgr->MagicPowerToNextLevel(m_Rank));
+    //xCapitalCityMgr->SendStateTo(player, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS, m_UpgradeMagicPower * 100 / xCapitalCityMgr->MagicPowerToNextLevel(m_Rank));
 }
 
 void CapitalCity::ClearAllState(Player* player)
@@ -46,7 +46,7 @@ void CapitalCity::ClearAllState(Player* player)
     xCapitalCityMgr->ClearStateOf(player, WORLDSTATE_CAPITAL_CITY_RESOURCE);
 	xCapitalCityMgr->ClearStateOf(player, WORLDSTATE_CAPITAL_CITY_MAGICPOWER);
     xCapitalCityMgr->ClearStateOf(player, WORLDSTATE_CC_UPGRADE_RESOURCE_PROGRESS);
-    xCapitalCityMgr->ClearStateOf(player, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS);
+    //xCapitalCityMgr->ClearStateOf(player, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS);
 }
 
 void CapitalCity::SendStateUpdate()
@@ -59,7 +59,7 @@ void CapitalCity::SendStateUpdate()
     sWorld->UpdateWorldStateInZone(m_Zone, WORLDSTATE_CAPITAL_CITY_RESOURCE, m_Resource);
     sWorld->UpdateWorldStateInZone(m_Zone, WORLDSTATE_CAPITAL_CITY_MAGICPOWER, m_MagicPower);
     sWorld->UpdateWorldStateInZone(m_Zone, WORLDSTATE_CC_UPGRADE_RESOURCE_PROGRESS, m_UpgradeResource * 100 / xCapitalCityMgr->ResourceToNextLevel(m_Rank));
-    sWorld->UpdateWorldStateInZone(m_Zone, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS, m_UpgradeMagicPower * 100 / xCapitalCityMgr->MagicPowerToNextLevel(m_Rank));
+    //sWorld->UpdateWorldStateInZone(m_Zone, WORLDSTATE_CC_UPGRADE_MAGICPOWER_PROGRESS, m_UpgradeMagicPower * 100 / xCapitalCityMgr->MagicPowerToNextLevel(m_Rank));
 }
 
 std::string CapitalCity::GetName()
@@ -119,9 +119,9 @@ void CapitalCity::Update()
             TC_LOG_ERROR("legacy.capitalcity", "No upgrade info for capital city level %u, need fix!", m_Rank);
             return;
         }
-        uint32 resourceForThisRound = std::min(resourceToNextLevel / 20, m_Resource);
+        uint32 resourceForThisRound = std::min((uint32)100, m_Resource);
         resourceForThisRound = std::min(resourceForThisRound, resourceToNextLevel - m_UpgradeResource);
-        uint32 magicPowerForThisRound = std::min(magicPowerToNextLevel / 20, m_MagicPower);
+        uint32 magicPowerForThisRound = std::min((uint32)100, m_MagicPower);
         magicPowerForThisRound = std::min(magicPowerForThisRound, magicPowerToNextLevel - m_UpgradeMagicPower);
 
         m_Resource -= resourceForThisRound;

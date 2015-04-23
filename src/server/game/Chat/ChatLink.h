@@ -61,6 +61,7 @@ public:
     {
         memset(_data, 0, sizeof(_data));
     }
+    static std::string FormatName(uint32 entry);
     virtual bool Initialize(std::istringstream& iss) override;
     virtual bool ValidateName(char* buffer, const char* context) override;
 
@@ -93,7 +94,7 @@ public:
     SpellChatLink() : ChatLink(), _spell(nullptr) { }
     virtual bool Initialize(std::istringstream& iss) override;
     virtual bool ValidateName(char* buffer, const char* context) override;
-
+    static std::string FormatName(uint32 entry);
 protected:
     SpellInfo const* _spell;
 };

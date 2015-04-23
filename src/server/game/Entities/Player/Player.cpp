@@ -84,6 +84,8 @@
 #include "WorldSession.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
+#include "Compounding.h"
+#include "ChatLink.h"
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -2008,13 +2010,13 @@ bool Player::BuildEnumData(PreparedQueryResult result, WorldPacket* data)
 
     uint32 playerBytes = fields[5].GetUInt32();
     uint32 playerBytes2 = fields[6].GetUInt32();
-    
+
     uint16 atLoginFlags = fields[15].GetUInt16();
 
     if (!ValidateAppearance(uint8(plrRace), uint8(plrClass), gender, uint8(playerBytes >> 16), uint8(playerBytes >> 24), uint8(playerBytes >> 8), uint8(playerBytes2), uint8(playerBytes)))
     {
         TC_LOG_ERROR("entities.player.loading", "Player %u has wrong Appearance values (Hair/Skin/Color), forcing recustomize", guid);
-        
+
         if (!(atLoginFlags & AT_LOGIN_CUSTOMIZE))
         {
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
@@ -3847,6 +3849,9 @@ bool Player::AddSpell(uint32 spellId, bool active, bool learning, bool dependent
     // update used talent points count
     m_usedTalentCount += talentCost;
 
+    if (spellId == 81876)
+        SetFreePrimaryProfessions(GetFreePrimaryProfessionPoints() + 2);
+
     // update free primary prof.points (if any, can be none in case GM .learn prof. learning)
     if (uint32 freeProfs = GetFreePrimaryProfessionPoints())
     {
@@ -4068,6 +4073,8 @@ void Player::RemoveSpell(uint32 spell_id, bool disabled, bool learn_low_rank)
     }
 
     // update free primary prof.points (if not overflow setting, can be in case GM use before .learn prof. learning)
+    if (spell_id == 81876)
+        SetFreePrimaryProfessions(GetFreePrimaryProfessionPoints() < 2 ? 0 : GetFreePrimaryProfessionPoints() - 2);
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_id);
     if (spellInfo && spellInfo->IsPrimaryProfessionFirstRank())
     {
@@ -6233,7 +6240,7 @@ bool Player::UpdateFishingSkill()
 // levels sync. with spell requirement for skill levels to learn
 // bonus abilities in sSkillLineAbilityStore
 // Used only to avoid scan DBC at each skill grow
-static uint32 bonusSkillLevels[ ] = {75, 150, 225, 300, 375, 450};
+static uint32 bonusSkillLevels[ ] = {50, 100, 150, 200, 250, 300, 350, 400, 450};
 static const size_t bonusSkillLevelsSize = sizeof(bonusSkillLevels) / sizeof(uint32);
 
 bool Player::UpdateSkillPro(uint16 SkillId, int32 Chance, uint32 step)
@@ -15622,6 +15629,13 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         SetMonthlyQuestStatus(quest_id);
     else if (quest->IsSeasonal())
         SetSeasonalQuestStatus(quest_id);
+    else if (!quest->IsRepeatable())
+    {
+        if (GetQuestStatus(26081) == QUEST_STATUS_INCOMPLETE)
+            AddItem(57372, 1);
+        else if (GetQuestStatus(26081) == QUEST_STATUS_REWARDED)
+            AddItem(57427, 1);
+    }
 
     RemoveActiveQuest(quest_id, false);
     m_RewardedQuests.insert(quest_id);
@@ -15658,6 +15672,47 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         }
         else
             CastSpell(this, quest->GetRewSpell(), true);
+    }
+
+    CapitalCity* city = NULL;
+    switch (quest_id)
+    {
+        case RECYCLE_QUEST_OGRIMMAR:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_ORGRIMMAR);
+            break;
+        case RECYCLE_QUEST_DARNASSUS:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_DARNASSUS);
+            break;
+        case RECYCLE_QUEST_EXODAR:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_EXODAR);
+            break;
+        case RECYCLE_QUEST_IRONFORGE:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_IRONFORGE);
+            break;
+        case RECYCLE_QUEST_SILVERMOON:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_SILVERMOON);
+            break;
+        case RECYCLE_QUEST_STORMWIND:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_STORMWIND);
+            break;
+        case RECYCLE_QUEST_THUNDERBLUFF:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_THUNDERBLUFF);
+            break;
+        case RECYCLE_QUEST_UNDERCITY:
+            city = xCapitalCityMgr->GetCapitalCityByID(CC_UNDERCITY);
+            break;
+        default:    
+            break;
+    }
+    if (city)
+    {
+        int32 resource = irand(4, 20);
+        city->AddResource(resource, this);
+        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+        MailDraft draft = MailDraft(296);
+        draft.AddMoney(resource * irand(8000, 10000));
+        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43340));
+        CharacterDatabase.CommitTransaction(trans);
     }
 
     if (quest->GetZoneOrSort() > 0)
@@ -17472,6 +17527,8 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     _LoadSupremacyStats(guid);
     m_PrimaryStat = fields[69].GetUInt8();
     m_SecondaryStat = fields[70].GetUInt8();
+
+    _LoadCollectedMemory(guid);
 
     SetUInt32Value(UNIT_FIELD_LEVEL, fields[6].GetUInt8());
     SetUInt32Value(PLAYER_XP, fields[7].GetUInt32());
@@ -21649,7 +21706,7 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
     // prevent stealth flight
     //RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_TALK);
 
-    if (sWorld->getBoolConfig(CONFIG_INSTANT_TAXI))
+    if (sWorld->getBoolConfig(CONFIG_INSTANT_TAXI) || HasSpell(81875))
     {
         TaxiNodesEntry const* lastPathNode = sTaxiNodesStore.LookupEntry(nodes[nodes.size()-1]);
         ASSERT(lastPathNode);
@@ -22842,7 +22899,7 @@ void Player::UpdateVisibilityOf(WorldObject* target)
 {
     if (HaveAtClient(target))
     {
-        if (!CanSeeOrDetect(target, false, true))
+        if (!CanSeeOrDetectEx(target, false, true))
         {
             if (target->GetTypeId() == TYPEID_UNIT)
                 BeforeVisibilityDestroy<Creature>(target->ToCreature(), this);
@@ -22857,7 +22914,7 @@ void Player::UpdateVisibilityOf(WorldObject* target)
     }
     else
     {
-        if (CanSeeOrDetect(target, false, true))
+        if (CanSeeOrDetectEx(target, false, true))
         {
             target->SendUpdateToPlayer(this);
             m_clientGUIDs.insert(target->GetGUID());
@@ -22931,7 +22988,7 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
 {
     if (HaveAtClient(target))
     {
-        if (!CanSeeOrDetect(target, false, true))
+        if (!CanSeeOrDetectEx(target, false, true))
         {
             BeforeVisibilityDestroy<T>(target, this);
 
@@ -22945,7 +23002,7 @@ void Player::UpdateVisibilityOf(T* target, UpdateData& data, std::set<Unit*>& vi
     }
     else //if (visibleNow.size() < 30 || target->GetTypeId() == TYPEID_UNIT && target->ToCreature()->IsVehicle())
     {
-        if (CanSeeOrDetect(target, false, true))
+        if (CanSeeOrDetectEx(target, false, true))
         {
             target->BuildCreateUpdateBlockForPlayer(&data, this);
             UpdateVisibilityOf_helper(m_clientGUIDs, target, visibleNow);
@@ -22984,7 +23041,10 @@ void Player::UpdateVisibilityForPlayer()
 
 void Player::InitPrimaryProfessions()
 {
-    SetFreePrimaryProfessions(sWorld->getIntConfig(CONFIG_MAX_PRIMARY_TRADE_SKILL));
+    uint16 count = sWorld->getIntConfig(CONFIG_MAX_PRIMARY_TRADE_SKILL);
+    if (HasSpell(81876))
+        count += 2;
+    SetFreePrimaryProfessions(count);
 }
 
 bool Player::ModifyMoney(int32 amount, bool sendError /*= true*/)
@@ -25295,11 +25355,11 @@ uint32 Player::CalculateTalentsPoints() const
     return uint32(talentPointsForLevel * sWorld->getRate(RATE_TALENT));
 }
 
-bool Player::IsKnowHowFlyIn(uint32 mapid, uint32 zone) const
+bool Player::CanFlyInZone(uint32 mapid, uint32 zone) const
 {
     // continent checked in SpellInfo::CheckLocation at cast and area update
     uint32 v_map = GetVirtualMapForMapAndZone(mapid, zone);
-    return v_map != 571 || HasSpell(54197); // Cold Weather Flying
+    return v_map != 571 || HasSpell(54197); // 54197 = Cold Weather Flying
 }
 
 void Player::LearnSpellHighestRank(uint32 spellid)
@@ -27358,6 +27418,21 @@ void Player::_LoadSupremacyStats(uint32 guid)
     }
 }
 
+void Player::_LoadCollectedMemory(uint32 guid)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_COLLECTED_MEMORY);
+    stmt->setUInt32(0, guid);
+    PreparedQueryResult result = CharacterDatabase.Query(stmt);
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            m_CollectedMemorySet.insert(fields[0].GetInt32());
+        } while (result->NextRow());
+    }
+}
+
 void Player::GiveSupremacyLevel()
 {
     if (m_SupremacyLevel > 3000)
@@ -27375,47 +27450,6 @@ void Player::GiveSupremacyLevel()
         CastSpell(this, 80899, true); // Levelup Visual
         ChatHandler(GetSession()).PSendSysMessage(sObjectMgr->GetServerMessage(13).c_str());
     }
-}
-
-void Player::SendLegacyMails()
-{
-    // all legacy items are unique and binding to account, so just send mail and unavailable it.
-    //LegacyItemList* data = GetSession()->GetLegacyItemList();
-    //if (!data || data->size() == 0)
-    //    return;
-
-    //for (LegacyItemList::iterator itr = data->begin(); itr != data->end(); ++itr)
-    //{
-    //    // one letter a item.
-    //    if (itr->available)
-    //    {
-    //        SQLTransaction trans = CharacterDatabase.BeginTransaction();
-    //        MailDraft draft = MailDraft(292);
-    //        Item* item = itr->entry ? Item::CreateItem(itr->entry, 1, this) : NULL;
-    //        if (item)
-    //        {
-    //            item->SaveToDB(trans);
-    //            draft.AddItem(item);
-    //        }
-    //        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43283));
-    //        CharacterDatabase.CommitTransaction(trans);
-    //        PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(LOGIN_UPD_LEGACY_ITEM);
-    //        stmt->setBool(0, false);
-    //        stmt->setUInt32(1, GetSession()->GetAccountId());
-    //        stmt->setUInt32(2, itr->entry);
-    //        LoginDatabase.Execute(stmt);
-    //        itr->available = false;
-    //    }
-    //}
-}
-
-void Player::UpdateLegacyItemRecord(int item)
-{
-    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_REP_LEGACY_ITEM);
-    stmt->setUInt32(0, GetSession()->GetAccountId());
-    stmt->setUInt32(1, item);
-    stmt->setUInt32(2, 0);
-    LoginDatabase.Execute(stmt);
 }
 
 uint32 Player::GetCapitalCityLevel()
@@ -27661,6 +27695,523 @@ void Player::UnlearnSpecTier(uint32 tier)
             ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(39, sObjectMgr->GetSpecTierName(itr->first).c_str(), itr->second.name.c_str()).c_str());
         }
     }
+}
+
+SpellFamilyNames Player::GetSpellFamilyName() const
+{
+    switch (getClass())
+    {
+        case CLASS_WARRIOR:
+            return SPELLFAMILY_WARRIOR;
+        case CLASS_PALADIN:
+            return SPELLFAMILY_PALADIN;
+        case CLASS_ROGUE:
+            return SPELLFAMILY_ROGUE;
+        case CLASS_HUNTER:
+            return SPELLFAMILY_HUNTER;
+        case CLASS_DEATH_KNIGHT:
+            return SPELLFAMILY_DEATHKNIGHT;
+        case CLASS_MAGE:
+            return SPELLFAMILY_MAGE;
+        case CLASS_WARLOCK:
+            return SPELLFAMILY_WARLOCK;
+        case CLASS_PRIEST:
+            return SPELLFAMILY_PRIEST;
+        case CLASS_DRUID:
+            return SPELLFAMILY_DRUID;
+        case CLASS_SHAMAN:
+            return SPELLFAMILY_SHAMAN;
+        default:
+            return SPELLFAMILY_GENERIC;
+    }
+}
+
+void Player::TryCompound()
+{
+    Item* compounder = GetCompoundContainer();
+    if (!compounder)
+    {
+        std::string name = ItemChatLink::FormatName(57373);
+        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(46, name.c_str()).c_str());
+        return;
+    }
+
+    uint8 bag = compounder->GetSlot();
+
+    Reagent reagent;
+
+    bool empty = true;
+    for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+    {
+        Item* item = GetItemByPos(bag, i);
+        if (item)
+        {
+            reagent.reagent[i] = item->GetEntry();
+            reagent.count[i] = item->GetCount();
+            empty = false;
+        }
+        else
+        {
+            reagent.reagent[i] = 0;
+            reagent.count[i] = 0;
+        }
+    }
+
+    if (empty)
+    {
+        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(45).c_str());
+        return;
+    }
+
+    bool done = false;
+
+    const ItemTemplate* itemProto = sObjectMgr->GetItemTemplate(reagent.reagent[0]);
+
+    if (itemProto && itemProto->Quality == ITEM_QUALITY_POOR)
+    {
+        xCompoundingMgr->StackReagents(reagent);
+
+        uint32 amount = xCompoundingMgr->CalculateRecycleAmount(reagent);
+        if (amount)
+        {
+            //take reagents
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (reagent.reagent[i])
+                {
+                    int32 reagentCount = reagent.count[i];
+                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j) // skip 1st slot
+                    {
+                        if (reagentCount > 0)
+                        {
+                            Item* item = GetItemByPos(bag, j);
+                            if (item && item->GetEntry() == reagent.reagent[i])
+                            {
+                                if (item->GetCount() > (uint32)reagentCount)
+                                {
+                                    item->SetCount(item->GetCount() - reagentCount);
+                                    break;
+                                }
+                                else
+                                {
+                                    reagentCount -= item->GetCount();
+                                    DestroyItem(bag, j, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // attempt store
+            ItemPosCountVec sDest;
+            // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
+            InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, 60319, amount);
+            if (msg == EQUIP_ERR_OK)
+                StoreNewItem(sDest, 60319, true);
+            else
+            {
+                SQLTransaction trans = CharacterDatabase.BeginTransaction();
+                MailDraft draft = MailDraft(295);
+                Item* item = Item::CreateItem(60319, amount, this);
+                if (item)
+                {
+                    item->SaveToDB(trans);
+                    draft.AddItem(item);
+                }
+                draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
+                CharacterDatabase.CommitTransaction(trans);
+            }
+
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(50).c_str());
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (reagent.reagent[i])
+                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(reagent.reagent[i]).c_str(), reagent.count[i]).c_str());
+            }
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(51).c_str());
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(60319).c_str(), amount).c_str());
+
+            done = true;
+        }
+    }
+
+    if (itemProto && (itemProto->Class == ITEM_CLASS_WEAPON || itemProto->Class == ITEM_CLASS_ARMOR)) // enchant
+    {
+        xCompoundingMgr->StackReagents(reagent);
+
+        const EnchantCompound* compound = xCompoundingMgr->TryEnchantCompound(this, itemProto, reagent);
+        if (compound)
+        {
+            //take reagents
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (compound->reagent[i])
+                {
+                    int32 reagentCount = compound->count[i];
+                    for (uint8 j = 1; j != MAX_COMPOUND_REAGENT; ++j) // skip 1st slot
+                    {
+                        if (reagentCount > 0)
+                        {
+                            Item* item = GetItemByPos(bag, j);
+                            if (item && item->GetEntry() == compound->reagent[i])
+                            {
+                                if (item->GetCount() > (uint32)reagentCount)
+                                {
+                                    item->SetCount(item->GetCount() - reagentCount);
+                                    break;
+                                }
+                                else
+                                {
+                                    reagentCount -= item->GetCount();
+                                    DestroyItem(bag, j, true);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item* item = GetItemByPos(bag, 0);
+
+            if (compound->duration)
+            {
+                ApplyEnchantment(item, TEMP_ENCHANTMENT_SLOT, false);
+                item->SetEnchantment(TEMP_ENCHANTMENT_SLOT, compound->enchant, compound->duration, 0);
+                ApplyEnchantment(item, TEMP_ENCHANTMENT_SLOT, true);
+            }
+            else
+            {
+                ApplyEnchantment(item, PERM_ENCHANTMENT_SLOT, false);
+                item->SetEnchantment(PERM_ENCHANTMENT_SLOT, compound->enchant, 0, 0);
+                ApplyEnchantment(item, PERM_ENCHANTMENT_SLOT, true);
+            }
+
+            std::string name = ItemChatLink::FormatName(itemProto->ItemId);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(47, name.c_str()).c_str());
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (compound->reagent[i])
+                {
+                    std::string reagentName = ItemChatLink::FormatName(compound->reagent[i]);
+                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, reagentName.c_str(), compound->count[i]).c_str());
+                }
+            }
+
+            if (HasSkill(SKILL_ENCHANTING))
+                UpdateSkillPro(SKILL_ENCHANTING, 200, 1);
+
+            done = true;
+        }
+    }
+
+    if (!done && itemProto && xCompoundingMgr->IsSocketStone(itemProto))
+    {
+        Item* item = GetItemByPos(bag, 1);
+        if (item)
+        {
+            const ItemTemplate* equipment = item->GetTemplate();
+            if (equipment && (equipment->Class == ITEM_CLASS_WEAPON || equipment->Class == ITEM_CLASS_ARMOR))
+            {
+                uint32 socketSlot = 0;
+                if (equipment->Socket[0].Color)
+                    socketSlot++;
+                if (equipment->Socket[1].Color)
+                    socketSlot++;
+                if (equipment->Socket[2].Color)
+                    socketSlot++;
+                if (socketSlot < 2)
+                {
+                    xCompoundingMgr->StackReagents(reagent);
+
+                    const SocketCompound* compound = xCompoundingMgr->TrySocketCompound(this, itemProto, reagent);
+                    {
+                        if (compound)
+                        {
+                            xCompoundingMgr->PickSocketReagent(compound, reagent);
+
+                            //take reagents
+                            int32 reagentCount = compound->count;
+                            for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
+                            {
+                                if (reagentCount > 0)
+                                {
+                                    Item* item = GetItemByPos(bag, j);
+                                    if (item && item->GetEntry() == compound->stone)
+                                    {
+                                        if (item->GetCount() > (uint32)reagentCount)
+                                        {
+                                            item->SetCount(item->GetCount() - reagentCount);
+                                            break;
+                                        }
+                                        else
+                                        {
+                                            reagentCount -= item->GetCount();
+                                            DestroyItem(bag, j, true);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // socket item
+                            ApplyEnchantment(item, PRISMATIC_ENCHANTMENT_SLOT, false);
+                            item->SetEnchantment(PRISMATIC_ENCHANTMENT_SLOT, 6770, 0, 0);
+                            ApplyEnchantment(item, PRISMATIC_ENCHANTMENT_SLOT, true);
+
+                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(48, ItemChatLink::FormatName(equipment->ItemId).c_str()).c_str());
+                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
+                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(itemProto->ItemId).c_str(), compound->count).c_str());
+
+                            done = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (!done && itemProto && xCompoundingMgr->IsRawStone(itemProto)) // gem
+    {
+        xCompoundingMgr->StackReagents(reagent);
+
+        const GemCompound* compound = xCompoundingMgr->TryGemCompound(this, reagent);
+        if (compound)
+        {
+            xCompoundingMgr->PickGemReagent(compound, reagent);
+
+            //take reagents
+            int32 reagentCount = compound->count;
+            for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
+            {
+                if (reagentCount > 0)
+                {
+                    Item* item = GetItemByPos(bag, j);
+                    if (item && item->GetEntry() == compound->rawStone)
+                    {
+                        if (item->GetCount() > (uint32)reagentCount)
+                        {
+                            item->SetCount(item->GetCount() - reagentCount);
+                            break;
+                        }
+                        else
+                        {
+                            reagentCount -= item->GetCount();
+                            DestroyItem(bag, j, true);
+                        }
+                    }
+                }
+            }
+
+            // step gemcrafting skill
+            if (HasSkill(SKILL_JEWELCRAFTING))
+                UpdateSkillPro(SKILL_JEWELCRAFTING, 200, 1);
+
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(41).c_str());
+            // attempt store
+            ItemPosCountVec sDest;
+            // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
+            InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, compound->gem, 1);
+            if (msg == EQUIP_ERR_OK)
+            {
+                StoreNewItem(sDest, compound->gem, true);
+                if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->gem))
+                {
+                    std::string name = ItemChatLink::FormatName(compound->gem);
+                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), 1).c_str());
+                }
+            }
+            else
+            {
+                SQLTransaction trans = CharacterDatabase.BeginTransaction();
+                MailDraft draft = MailDraft(295);
+                Item* item = Item::CreateItem(compound->gem, 1, this);
+                if (item)
+                {
+                    item->SaveToDB(trans);
+                    draft.AddItem(item);
+                }
+                draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
+                CharacterDatabase.CommitTransaction(trans);
+
+                if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->gem))
+                {
+                    std::string name = ItemChatLink::FormatName(compound->gem);
+                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), 1).c_str());
+                }
+            }
+
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
+
+            if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->rawStone))
+            {
+                std::string name = ItemChatLink::FormatName(compound->rawStone);
+                ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->count).c_str());
+            }
+
+            done = true;
+        }
+    }
+
+    if (!done) // recipe
+    {
+        xCompoundingMgr->StackReagents(reagent);
+
+        const RecipeCompound* compound = xCompoundingMgr->TryRecipeCompound(this, reagent);
+
+        if (compound)
+        {
+            // check phase
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (compound->reagent[i])
+                {
+                    int32 reagentCount = compound->reagentCount[i];
+                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
+                    {
+                        Item* item = GetItemByPos(bag, j);
+                        if (item && item->GetEntry() == compound->reagent[i])
+                            reagentCount -= item->GetCount();
+                    }
+                    if (reagentCount > 0)
+                        return;
+                }
+            }
+
+            //take reagents
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (compound->reagent[i])
+                {
+                    int32 reagentCount = compound->reagentCount[i];
+                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
+                    {
+                        if (reagentCount > 0)
+                        {
+                            Item* item = GetItemByPos(bag, j);
+                            if (item && item->GetEntry() == compound->reagent[i])
+                            {
+                                if (item->GetCount() > (uint32)reagentCount)
+                                {
+                                    item->SetCount(item->GetCount() - reagentCount);
+                                    break;
+                                }
+                                else
+                                {
+                                    reagentCount -= item->GetCount();
+                                    DestroyItem(bag, j, true);
+                                }
+
+                            }
+                        }
+                    }
+                }
+            }
+
+            // step skill if possible
+            if (compound->reqSkill && HasSkill(compound->reqSkill))
+            {
+                if (GetSkillValue(compound->reqSkill) < compound->skillUpYellow)
+                    UpdateSkillPro(compound->reqSkill, 1000, 1);
+                else if (GetSkillValue(compound->reqSkill) < compound->skillUpGreen)
+                    UpdateSkillPro(compound->reqSkill, 250, 1);
+            }
+
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(41).c_str());
+            for (uint8 i = 0; i != MAX_COMPOUND_ITEM; ++i)
+            {
+                if (compound->item[i])
+                {
+                    // attempt store
+                    ItemPosCountVec sDest;
+                    // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
+                    InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, compound->item[i], compound->itemCount[i]);
+                    if (msg == EQUIP_ERR_OK)
+                    {
+                        StoreNewItem(sDest, compound->item[i], true, Item::GenerateItemRandomPropertyId(compound->item[i]));
+                        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->item[i]))
+                        {
+                            std::string name = ItemChatLink::FormatName(compound->item[i]);
+                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->itemCount[i]).c_str());
+                        }
+                    }
+                    else
+                    {
+                        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+                        MailDraft draft = MailDraft(295);
+                        Item* item = Item::CreateItem(compound->item[i], compound->itemCount[i], this);
+                        if (item)
+                        {
+                            item->SaveToDB(trans);
+                            draft.AddItem(item);
+                        }
+                        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
+                        CharacterDatabase.CommitTransaction(trans);
+
+                        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->item[i]))
+                        {
+                            std::string name = ItemChatLink::FormatName(compound->item[i]);
+                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->itemCount[i]).c_str());
+                        }
+                    }
+                }
+            }
+
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
+            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+            {
+                if (compound->reagent[i])
+                {
+                    if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->reagent[i]))
+                    {
+                        std::string name = ItemChatLink::FormatName(compound->reagent[i]);
+                        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->reagentCount[i]).c_str());
+                    }
+                }
+            }
+        }
+        else
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(44).c_str());
+    }
+}
+
+Item* Player::GetCompoundContainer() const
+{
+    for (uint8 i = INVENTORY_SLOT_BAG_START; i != INVENTORY_SLOT_BAG_END; ++i)
+    {
+        Item* item = m_items[i];
+        if (item && item->GetEntry() == 57373)
+            return item;
+    }
+    return NULL;
+}
+
+bool Player::CanSeeOrDetectEx(WorldObject const* obj, bool ignoreStealth /* = false */, bool distanceCheck /* = false */) const
+{
+    if (const Creature* creature = obj->ToCreature())
+    {
+        int32 entry = creature->GetEntry();
+        if (sObjectMgr->IsMemoryCollector(entry) && MemoryCollected(entry))
+            return false;
+    }
+
+    return CanSeeOrDetect(obj, ignoreStealth, distanceCheck);
+}
+
+bool Player::MemoryCollected(int32 entry) const
+{
+    CollectedMemorySet::const_iterator itr = m_CollectedMemorySet.find(entry);
+    return itr != m_CollectedMemorySet.end();
+}
+
+void Player::SaveCollectedMemory(int32 memory)
+{
+    m_CollectedMemorySet.insert(memory);
+    UpdateVisibilityForPlayer();
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_COLLECTED_MEMORY);
+    stmt->setUInt32(0, GetGUID());
+    stmt->setInt32(1, memory);
+    CharacterDatabase.Execute(stmt);
 }
 
 bool Player::ValidateAppearance(uint8 race, uint8 class_, uint8 gender, uint8 hairID, uint8 hairColor, uint8 faceID, uint8 facialHair, uint8 skinColor, bool create /*=false*/)

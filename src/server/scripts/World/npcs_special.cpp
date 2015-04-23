@@ -57,6 +57,8 @@ EndContentData */
 #include "Pet.h"
 #include "CreatureTextMgr.h"
 #include "CapitalCityMgr.h"
+#include "ChatLink.h"
+#include "MemoryMgr.h"
 
 /*########
 # npc_air_force_bots
@@ -2542,6 +2544,7 @@ public:
             uint32 skill = action - GOSSIP_ACTION_SPEC_LEARN_START;
             // learn skill
             player->SetSkill(skill, 1, 1, 100);
+            creature->SendPlaySpellImpact(player->GetGUID(), 362);
             if (player->GetQuestStatus(26083) == QUEST_STATUS_INCOMPLETE)
                 player->CompleteQuest(26083);
             player->CLOSE_GOSSIP_MENU();
@@ -2643,6 +2646,242 @@ public:
     }
 };
 
+// This fuction add's a menu item,
+// a - Icon Id
+// b - Text
+// c - Sender(this is to identify the current Menu with this item)
+// d - Action (identifys this Menu Item)
+// e - Text to be displayed in pop up box
+// f - Money value in pop up box
+// g - Coded
+// h - Menu ID from DB
+// i - Menu item ID from DB
+
+class memory_collect_creature : public CreatureScript
+{
+public:
+    memory_collect_creature() : CreatureScript("memory_collect_creature") {}
+
+    struct memory_collect_creature_CreatureAI : public CreatureAI
+    {
+        memory_collect_creature_CreatureAI(Creature* creature) : CreatureAI(creature) {}
+
+        void Reset() override
+        {
+            me->AddAura(81873, me);
+            me->AddAura(81874, me);
+            me->AddAura(81395, me);
+            me->SetStandState(UNIT_STAND_STATE_KNEEL);
+        }
+
+        void UpdateAI(uint32 diff) override { }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new memory_collect_creature_CreatureAI(creature);
+    }
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        int32 entry = creature->GetEntry();
+        if (const MemoryCollector* memory = sObjectMgr->GetMemoryCollector(entry))
+        {
+            player->PlayerTalkClass->ClearMenus();
+            if (!player->MemoryCollected(entry) || (memory->item && player->HasItemCount(memory->item, 1, true)) || (memory->spell && player->HasSpell(memory->spell)))
+            {
+                std::string itemName = ItemChatLink::FormatName(memory->reqItem);
+                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(55), GOSSIP_SENDER_MAIN, 1001, sObjectMgr->GetServerMessage(54, itemName.c_str(), memory->count), 0, false);
+            }
+            player->SEND_GOSSIP_MENU(memory->text, creature->GetGUID());
+        }
+        else
+            player->CLOSE_GOSSIP_MENU();
+
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        if (action == 1001)
+        {
+            int32 entry = creature->GetEntry();
+            if (const MemoryCollector* memory = sObjectMgr->GetMemoryCollector(entry))
+            {
+                if (!player->HasItemCount(memory->reqItem, memory->count))
+                {
+                    player->CLOSE_GOSSIP_MENU();
+                    std::string name = ItemChatLink::FormatName(57427);
+                    ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(53, name.c_str()).c_str());
+                }
+                else
+                {
+                    uint32 count = memory->count;
+                    player->DestroyItemCount(memory->reqItem, count, true);
+                    if (memory->item)
+                    {
+                        ItemPosCountVec sDest;
+                        // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
+                        InventoryResult msg = player->CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, memory->item, 1);
+                        if (msg == EQUIP_ERR_OK)
+                            player->StoreNewItem(sDest, memory->item, true);
+                        else
+                        {
+                            SQLTransaction trans = CharacterDatabase.BeginTransaction();
+                            MailDraft draft = MailDraft(297);
+                            Item* item = Item::CreateItem(memory->item, 1, player);
+                            if (item)
+                            {
+                                item->SaveToDB(trans);
+                                draft.AddItem(item);
+                            }
+                            draft.SendMailTo(trans, player, MailSender(MAIL_CREATURE, 43304));
+                            CharacterDatabase.CommitTransaction(trans);
+                        }
+
+                        std::string name = ItemChatLink::FormatName(memory->item);
+                        ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
+                    }
+
+                    if (memory->spell)
+                    {
+                        player->LearnSpell(memory->spell, false);
+                        std::string name = SpellChatLink::FormatName(memory->spell);
+                        ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
+                    }
+
+                    player->CLOSE_GOSSIP_MENU();
+                    player->SaveCollectedMemory(creature->GetEntry());
+                    player->SaveToDB(); // in case crash during saving cycle.
+                }
+            }
+            else
+                player->CLOSE_GOSSIP_MENU();
+        }
+        else
+            player->CLOSE_GOSSIP_MENU();
+        return true;
+    }
+};
+
+class npc_xxe : public CreatureScript
+{
+public:
+    npc_xxe() : CreatureScript("npc_xxe") { }
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+        if (creature->GetOwnerGUID() != player->GetGUID())
+            player->SEND_GOSSIP_MENU(31306, creature->GetGUID());
+        else
+        {
+            player->ADD_GOSSIP_ITEM_DB(55129, 0, GOSSIP_SENDER_MAIN, 1001);
+            player->ADD_GOSSIP_ITEM_DB(55129, 1, GOSSIP_SENDER_MAIN, 1002);
+            if (player->getClass() == CLASS_HUNTER)
+            {
+                if (Pet* pet = player->GetPet())
+                {
+                    if (pet->GetHappinessState() != HAPPY)
+                        player->ADD_GOSSIP_ITEM_DB(55129, 2, GOSSIP_SENDER_MAIN, 1003);
+                }
+            }
+                
+            player->SEND_GOSSIP_MENU(31305, creature->GetGUID());
+        }
+
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        if (creature->GetOwnerGUID() != player->GetGUID())
+        {
+            player->CLOSE_GOSSIP_MENU();
+            return true;
+        }
+
+        switch (action)
+        {
+            case 1001:
+                player->GetSession()->SendListInventory(creature->GetGUID());
+                break;
+            case 1002:
+                creature->CastSpell(player, 81881, false);
+                player->DurabilityRepairAll(false, 0, false);
+                player->CLOSE_GOSSIP_MENU();
+                break;
+            case 1003:
+                if (Pet* pet = player->GetPet())
+                    creature->CastSpell(pet, 6991, false);
+                break;
+            default:
+                player->CLOSE_GOSSIP_MENU();
+                break;
+        }
+
+        return true;
+    }
+};
+
+class npc_spectral_mechant : public CreatureScript
+{
+public:
+    npc_spectral_mechant() : CreatureScript("npc_spectral_mechant") {}
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+        if (player->GetGUID() != creature->GetOwnerGUID())
+            player->SEND_GOSSIP_MENU(31307, creature->GetGUID());
+        else
+        {
+            player->ADD_GOSSIP_ITEM_DB(55132, 0, GOSSIP_SENDER_MAIN, 1001);
+            player->SEND_GOSSIP_MENU(31308, creature->GetGUID());
+        }
+
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        if (player->GetGUID() == creature->GetOwnerGUID())
+        {
+            if (action == 1001)
+                player->GetSession()->SendListInventory(creature->GetGUID());
+        }
+        else
+            player->CLOSE_GOSSIP_MENU();
+
+        return true;
+    }
+};
+
+class npc_memory_code_fetcher : public CreatureScript
+{
+public:
+    npc_memory_code_fetcher() : CreatureScript("npc_memory_code_fetcher") {}
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+        player->ADD_GOSSIP_ITEM_DB(55133, 0, GOSSIP_SENDER_MAIN, 1001);
+        player->SEND_GOSSIP_MENU(31309, creature->GetGUID());
+        return true;
+    }
+
+    bool OnGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 action, const char* code) override
+    {
+        if (action == 1001)
+        {
+            std::string c = code;
+            xMemoryMgr->FetchMemoryFromCode(player, c);
+            player->CLOSE_GOSSIP_MENU();
+        }
+        return true;
+    }
+};
+
 void AddSC_npcs_special()
 {
     new npc_air_force_bots();
@@ -2666,4 +2905,8 @@ void AddSC_npcs_special()
     new npc_spring_rabbit();
     new npc_imp_in_a_ball();
     new npc_shilvasa_exatier();
+    new memory_collect_creature();
+    new npc_xxe();
+    new npc_spectral_mechant();
+    new npc_memory_code_fetcher();
 }

@@ -33,8 +33,8 @@ namespace AuthHelper
         //{10505, 3, 2, 2, 'a'},
         //{9947,  3, 1, 3, ' '},
         //{8606,  2, 4, 3, ' '},
-        { 10015, 1, 0, 0, ' ' },
-        {0,     0, 0, 0, ' '}                                   // terminator
+        { 10020, 1, 0, 0, ' ' },
+        { 0,     0, 0, 0, ' ' }                                   // terminator
     };
 
     static RealmBuildInfo const PreBcAcceptedClientBuilds[] =

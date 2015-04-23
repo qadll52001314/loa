@@ -5447,6 +5447,178 @@ public:
     }
 };
 
+// 81735
+class spell_legacy_compound : public SpellScriptLoader
+{
+public:
+    spell_legacy_compound() : SpellScriptLoader("spell_legacy_compound") { }
+
+    class spell_compound_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_compound_SpellScript);
+
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                player->TryCompound();
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_compound_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_compound_SpellScript();
+    }
+};
+
+// 81871
+class spell_legacy_memory : public SpellScriptLoader
+{
+public:
+    spell_legacy_memory() : SpellScriptLoader("spell_legacy_memory") { }
+
+    class spell_memory_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_memory_AuraScript);
+
+        void HandleApply(AuraEffect const* aurEff, AuraEffectHandleModes mode)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->SetByteFlag(PLAYER_FIELD_BYTES2, 3, PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW);
+            player->SetPhaseMask(player->GetPhaseMask() | PHASEMASK_MEMORY, true);
+        }
+
+        void HandleRemove(AuraEffect const* aurEff, AuraEffectHandleModes mode)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->RemoveByteFlag(PLAYER_FIELD_BYTES2, 3, PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW);
+            player->SetPhaseMask(player->GetPhaseMask() ^ PHASEMASK_MEMORY, true);
+        }
+
+        void Register() override
+        {
+            OnEffectApply += AuraEffectApplyFn(spell_memory_AuraScript::HandleApply, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+            OnEffectRemove += AuraEffectRemoveFn(spell_memory_AuraScript::HandleRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_memory_AuraScript();
+    }
+};
+
+// 81878
+class spell_legacy_rebirth : public SpellScriptLoader
+{
+public:
+    spell_legacy_rebirth() : SpellScriptLoader("spell_legacy_rebirth") {}
+
+    class spell_legacy_rebirth_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_legacy_rebirth_SpellScript);
+
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                uint16 flag = AT_LOGIN_RENAME | AT_LOGIN_RESET_TALENTS | AT_LOGIN_CUSTOMIZE | AT_LOGIN_RESET_PET_TALENTS;
+                PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
+                stmt->setUInt16(0, flag);
+                player->SetAtLoginFlag(flag);
+                stmt->setUInt32(1, player->GetGUIDLow());
+                CharacterDatabase.Execute(stmt);
+                ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(56).c_str());
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_legacy_rebirth_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_legacy_rebirth_SpellScript();
+    }
+};
+
+// 81878
+class spell_legacy_destruct : public SpellScriptLoader
+{
+public:
+    spell_legacy_destruct() : SpellScriptLoader("spell_legacy_destruct") {}
+
+    class spell_legacy_destruct_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_legacy_destruct_SpellScript);
+
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                uint16 flag = AT_LOGIN_CHANGE_FACTION | AT_LOGIN_CHANGE_RACE | AT_LOGIN_RENAME | AT_LOGIN_CUSTOMIZE;
+                PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
+                stmt->setUInt16(0, flag);
+                player->SetAtLoginFlag(flag);
+                stmt->setUInt32(1, player->GetGUIDLow());
+                CharacterDatabase.Execute(stmt);
+                ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(57).c_str());
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_legacy_destruct_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_legacy_destruct_SpellScript();
+    }
+};
+
+class spell_tier_3_5_proc : public SpellScriptLoader
+{
+public:
+    spell_tier_3_5_proc() : SpellScriptLoader("spell_tier_3_5_proc") { }
+
+    class spell_tier_3_5_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_tier_3_5_proc_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            uint32 damage = eventInfo.GetDamageInfo()->GetDamage();
+            if (!damage)
+                return false;
+
+            const SpellInfo* spell = eventInfo.GetSpellInfo();
+            if (spell && spell->HasAreaAuraEffect())
+                return false;
+
+            return true;
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_tier_3_5_proc_AuraScript::HandleCheckProc);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_tier_3_5_proc_AuraScript();
+    }
+};
 
 void AddSC_generic_spell_scripts()
 {
@@ -5568,4 +5740,9 @@ void AddSC_generic_spell_scripts()
     new spell_spec_tier4_7_periodic_proc();
     new spell_spec_tier4_5_heal_proc();
     new spell_spec_tier4_4_proc();
+    new spell_legacy_compound();
+    new spell_legacy_memory();
+    new spell_legacy_rebirth();
+    new spell_legacy_destruct();
+    new spell_tier_3_5_proc();
 }
