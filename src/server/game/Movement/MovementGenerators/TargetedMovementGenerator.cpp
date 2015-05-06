@@ -46,7 +46,7 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T* owner, bool up
         if (!i_offset)
         {
             // to nearest contact position
-            i_target->GetContactPoint(owner, x, y, z);
+            i_target->GetContactPoint(owner, x, y, z, 0.5f, true);
         }
         else
         {
@@ -151,7 +151,7 @@ bool TargetedMovementGeneratorMedium<T, D>::DoUpdate(T* owner, uint32 time_diff)
     i_recheckDistance.Update(time_diff);
     if (i_recheckDistance.Passed())
     {
-        i_recheckDistance.Reset(100);
+        i_recheckDistance.Reset(50);
         //More distance let have better performance, less distance let have more sensitive reaction at target move.
         float allowed_dist = owner->GetCombatReach() + sWorld->getRate(RATE_TARGET_POS_RECALCULATION_RANGE);
         G3D::Vector3 dest = owner->movespline->FinalDestination();
@@ -160,10 +160,22 @@ bool TargetedMovementGeneratorMedium<T, D>::DoUpdate(T* owner, uint32 time_diff)
                 transport->CalculatePassengerPosition(dest.x, dest.y, dest.z);
 
         // First check distance
-        if (owner->GetTypeId() == TYPEID_UNIT && owner->ToCreature()->CanFly())
+        //if (owner->GetTypeId() == TYPEID_UNIT && owner->ToCreature()->CanFly())
+        //    targetMoved = !i_target->IsWithinDist3d(dest.x, dest.y, dest.z, allowed_dist);
+        //else
+        //    targetMoved = !i_target->IsWithinDist2d(dest.x, dest.y, allowed_dist);
+
+        //if (i_targetPosition != i_target->GetPosition())
+        //{
+        //    if (owner->GetDistance(i_targetPosition) > allowed_dist)
+        //    {
+        //        i_targetPosition = i_target->GetPosition();
+        //        targetMoved = true;
+        //    }
+        //}
+
+        if (owner->GetTypeId() == TYPEID_UNIT)
             targetMoved = !i_target->IsWithinDist3d(dest.x, dest.y, dest.z, allowed_dist);
-        else
-            targetMoved = !i_target->IsWithinDist2d(dest.x, dest.y, allowed_dist);
 
         // then, if the target is in range, check also Line of Sight.
         if (!targetMoved)
@@ -182,7 +194,7 @@ bool TargetedMovementGeneratorMedium<T, D>::DoUpdate(T* owner, uint32 time_diff)
         if (!i_targetReached)
         {
             i_targetReached = true;
-            static_cast<D*>(this)->_reachTarget(owner);
+            static_cast<D*>(this)->_reachTarget(owner, i_path ? i_path->GetEndPosition() == i_path->GetActualEndPosition() : true);
         }
     }
 
@@ -191,10 +203,17 @@ bool TargetedMovementGeneratorMedium<T, D>::DoUpdate(T* owner, uint32 time_diff)
 
 //-----------------------------------------------//
 template<class T>
-void ChaseMovementGenerator<T>::_reachTarget(T* owner)
+void ChaseMovementGenerator<T>::_reachTarget(T* owner, bool destMatch /*= true*/)
 {
+    i_recheckDistance.Reset(250);
     if (owner->IsWithinMeleeRange(this->i_target.getTarget()))
+    {
+        if (owner->HasUnitState(UNIT_STATE_EVADE))
+            owner->ClearUnitState(UNIT_STATE_EVADE);
         owner->Attack(this->i_target.getTarget(), true);
+    }
+    else if (!destMatch)
+        owner->AddUnitState(UNIT_STATE_EVADE);
 }
 
 template<>
@@ -317,8 +336,8 @@ template bool TargetedMovementGeneratorMedium<Player, FollowMovementGenerator<Pl
 template bool TargetedMovementGeneratorMedium<Creature, ChaseMovementGenerator<Creature> >::DoUpdate(Creature*, uint32);
 template bool TargetedMovementGeneratorMedium<Creature, FollowMovementGenerator<Creature> >::DoUpdate(Creature*, uint32);
 
-template void ChaseMovementGenerator<Player>::_reachTarget(Player*);
-template void ChaseMovementGenerator<Creature>::_reachTarget(Creature*);
+template void ChaseMovementGenerator<Player>::_reachTarget(Player*, bool);
+template void ChaseMovementGenerator<Creature>::_reachTarget(Creature*, bool);
 template void ChaseMovementGenerator<Player>::DoFinalize(Player*);
 template void ChaseMovementGenerator<Creature>::DoFinalize(Creature*);
 template void ChaseMovementGenerator<Player>::DoReset(Player*);

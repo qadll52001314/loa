@@ -84,8 +84,10 @@
 #include "WorldSession.h"
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
-#include "Compounding.h"
+#include "CompoundMgr.h"
 #include "ChatLink.h"
+#include "MemoryMgr.h"
+#include "LegacyMgr.h"
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -1634,6 +1636,8 @@ void Player::Update(uint32 p_time)
             if (charmer->GetTypeId() == TYPEID_UNIT && charmer->IsAlive())
                 UpdateCharmedAI();
 
+    UpdateLegacyItems(p_time);
+
     // Update items that have just a limited lifetime
     if (now > m_Last_tick)
         UpdateItemDuration(uint32(now - m_Last_tick));
@@ -1881,6 +1885,8 @@ void Player::Update(uint32 p_time)
                 ++itr;
         }
     }
+
+    UpdateLootCooldown(p_time);
 
     if (getClass() == CLASS_DEATH_KNIGHT)
     {
@@ -3035,10 +3041,6 @@ void Player::GiveXP(uint32 xp, Unit* victim, float group_rate)
 
     sScriptMgr->OnGivePlayerXP(this, xp, victim);
 
-    // XP to money conversion processed in Player::RewardQuest
-    if (level >= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
-        return;
-
     uint32 bonus_xp = 0;
     bool recruitAFriend = GetsRecruitAFriendBonus(true);
 
@@ -3047,6 +3049,38 @@ void Player::GiveXP(uint32 xp, Unit* victim, float group_rate)
         bonus_xp = 2 * xp; // xp + bonus_xp must add up to 3 * xp for RaF; calculation for quests done client-side
     else
         bonus_xp = victim ? GetXPRestBonus(xp) : 0; // XP resting bonus
+
+    // legacy item xp absorb effect
+    bool legacyEquiped = false;
+    std::vector<uint8> legacyItems;
+    for (uint8 i = EQUIPMENT_SLOT_HEAD; i != EQUIPMENT_SLOT_END; ++i)
+    {
+        Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i);
+        if (item && item->GetTemplate()->Flags & ITEM_PROTO_FLAG_LEGACY)
+        {
+            legacyEquiped = true;
+            legacyItems.push_back(i);
+        }
+    }
+
+    if (legacyEquiped)
+    {
+        // XP to money conversion processed in Player::RewardQuest
+        if (level >= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        {
+            uint8 pos = legacyItems[urand(0, legacyItems.size() - 1)];
+            Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, pos);
+            item->GainExp(xp + bonus_xp);
+            SendLogXPGain(xp, victim, bonus_xp, recruitAFriend, group_rate);
+            return;
+        }
+
+        uint8 pos = legacyItems[urand(0, legacyItems.size() - 1)];
+        Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, pos);
+        item->GainExp((xp + bonus_xp) / 2);
+        xp /= 2;
+        bonus_xp /= 2;
+    }
 
     SendLogXPGain(xp, victim, bonus_xp, recruitAFriend, group_rate);
 
@@ -3849,9 +3883,6 @@ bool Player::AddSpell(uint32 spellId, bool active, bool learning, bool dependent
     // update used talent points count
     m_usedTalentCount += talentCost;
 
-    if (spellId == 81876)
-        SetFreePrimaryProfessions(GetFreePrimaryProfessionPoints() + 2);
-
     // update free primary prof.points (if any, can be none in case GM .learn prof. learning)
     if (uint32 freeProfs = GetFreePrimaryProfessionPoints())
     {
@@ -4073,8 +4104,6 @@ void Player::RemoveSpell(uint32 spell_id, bool disabled, bool learn_low_rank)
     }
 
     // update free primary prof.points (if not overflow setting, can be in case GM use before .learn prof. learning)
-    if (spell_id == 81876)
-        SetFreePrimaryProfessions(GetFreePrimaryProfessionPoints() < 2 ? 0 : GetFreePrimaryProfessionPoints() - 2);
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_id);
     if (spellInfo && spellInfo->IsPrimaryProfessionFirstRank())
     {
@@ -4809,8 +4838,8 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
                             do
                             {
                                 Field* itemFields = resultItems->Fetch();
-                                uint32 item_guidlow = itemFields[11].GetUInt32();
-                                uint32 item_template = itemFields[12].GetUInt32();
+                                uint32 item_guidlow = itemFields[12].GetUInt32();
+                                uint32 item_template = itemFields[13].GetUInt32();
 
                                 ItemTemplate const* itemProto = sObjectMgr->GetItemTemplate(item_template);
                                 if (!itemProto)
@@ -8005,6 +8034,7 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             case ITEM_MOD_HIT_MELEE_RATING:
                 ApplyRatingMod(CR_HIT_MELEE, int32(val), apply);
+                ApplyRatingMod(CR_HIT_RANGED, int32(val), apply);
                 break;
             case ITEM_MOD_HIT_RANGED_RATING:
                 ApplyRatingMod(CR_HIT_RANGED, int32(val), apply);
@@ -8014,6 +8044,7 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             case ITEM_MOD_CRIT_MELEE_RATING:
                 ApplyRatingMod(CR_CRIT_MELEE, int32(val), apply);
+                ApplyRatingMod(CR_CRIT_RANGED, int32(val), apply);
                 break;
             case ITEM_MOD_CRIT_RANGED_RATING:
                 ApplyRatingMod(CR_CRIT_RANGED, int32(val), apply);
@@ -8041,6 +8072,7 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             case ITEM_MOD_HASTE_MELEE_RATING:
                 ApplyRatingMod(CR_HASTE_MELEE, int32(val), apply);
+                ApplyRatingMod(CR_HASTE_RANGED, int32(val), apply);
                 break;
             case ITEM_MOD_HASTE_RANGED_RATING:
                 ApplyRatingMod(CR_HASTE_RANGED, int32(val), apply);
@@ -8111,7 +8143,10 @@ void Player::_ApplyItemBonuses(ItemTemplate const* proto, uint8 slot, bool apply
                 break;
             // deprecated item mods
             case ITEM_MOD_SPELL_HEALING_DONE:
+                ApplySpellHealingBonus(int32(val), apply);
+                break;
             case ITEM_MOD_SPELL_DAMAGE_DONE:
+                ApplySpellDamageBonus(int32(val), apply);
                 break;
         }
     }
@@ -14199,6 +14234,7 @@ void Player::ApplyEnchantment(Item* item, EnchantmentSlot slot, bool apply, bool
                             break;
                         case ITEM_MOD_HIT_MELEE_RATING:
                             ApplyRatingMod(CR_HIT_MELEE, enchant_amount, apply);
+                            ApplyRatingMod(CR_HIT_RANGED, enchant_amount, apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u MELEE_HIT", enchant_amount);
                             break;
                         case ITEM_MOD_HIT_RANGED_RATING:
@@ -14211,42 +14247,42 @@ void Player::ApplyEnchantment(Item* item, EnchantmentSlot slot, bool apply, bool
                             break;
                         case ITEM_MOD_CRIT_MELEE_RATING:
                             ApplyRatingMod(CR_CRIT_MELEE, enchant_amount, apply);
+                            ApplyRatingMod(CR_CRIT_RANGED, enchant_amount, apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u MELEE_CRIT", enchant_amount);
                             break;
                         case ITEM_MOD_CRIT_RANGED_RATING:
                             ApplyRatingMod(CR_CRIT_RANGED, enchant_amount, apply);
+                            ApplyRatingMod(CR_CRIT_SPELL, enchant_amount, apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u RANGED_CRIT", enchant_amount);
                             break;
                         case ITEM_MOD_CRIT_SPELL_RATING:
                             ApplyRatingMod(CR_CRIT_SPELL, enchant_amount, apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u SPELL_CRIT", enchant_amount);
                             break;
-//                        Values from ITEM_STAT_MELEE_HA_RATING to ITEM_MOD_HASTE_RANGED_RATING are never used
-//                        in Enchantments
-//                        case ITEM_MOD_HIT_TAKEN_MELEE_RATING:
-//                            ApplyRatingMod(CR_HIT_TAKEN_MELEE, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_HIT_TAKEN_RANGED_RATING:
-//                            ApplyRatingMod(CR_HIT_TAKEN_RANGED, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_HIT_TAKEN_SPELL_RATING:
-//                            ApplyRatingMod(CR_HIT_TAKEN_SPELL, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_CRIT_TAKEN_MELEE_RATING:
-//                            ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_CRIT_TAKEN_RANGED_RATING:
-//                            ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_CRIT_TAKEN_SPELL_RATING:
-//                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_HASTE_MELEE_RATING:
-//                            ApplyRatingMod(CR_HASTE_MELEE, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_HASTE_RANGED_RATING:
-//                            ApplyRatingMod(CR_HASTE_RANGED, enchant_amount, apply);
-//                            break;
+                        case ITEM_MOD_HIT_TAKEN_MELEE_RATING:
+                            ApplyRatingMod(CR_HIT_TAKEN_MELEE, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_HIT_TAKEN_RANGED_RATING:
+                            ApplyRatingMod(CR_HIT_TAKEN_RANGED, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_HIT_TAKEN_SPELL_RATING:
+                            ApplyRatingMod(CR_HIT_TAKEN_SPELL, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_CRIT_TAKEN_MELEE_RATING:
+                            ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_CRIT_TAKEN_RANGED_RATING:
+                            ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_CRIT_TAKEN_SPELL_RATING:
+                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_HASTE_MELEE_RATING:
+                            ApplyRatingMod(CR_HASTE_MELEE, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_HASTE_RANGED_RATING:
+                            ApplyRatingMod(CR_HASTE_RANGED, enchant_amount, apply);
+                            break;
                         case ITEM_MOD_HASTE_SPELL_RATING:
                             ApplyRatingMod(CR_HASTE_SPELL, enchant_amount, apply);
                             break;
@@ -14262,17 +14298,16 @@ void Player::ApplyEnchantment(Item* item, EnchantmentSlot slot, bool apply, bool
                             ApplyRatingMod(CR_CRIT_SPELL, enchant_amount, apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u CRITICAL", enchant_amount);
                             break;
-//                        Values ITEM_MOD_HIT_TAKEN_RATING and ITEM_MOD_CRIT_TAKEN_RATING are never used in Enchantment
-//                        case ITEM_MOD_HIT_TAKEN_RATING:
-//                            ApplyRatingMod(CR_HIT_TAKEN_MELEE, enchant_amount, apply);
-//                            ApplyRatingMod(CR_HIT_TAKEN_RANGED, enchant_amount, apply);
-//                            ApplyRatingMod(CR_HIT_TAKEN_SPELL, enchant_amount, apply);
-//                            break;
-//                        case ITEM_MOD_CRIT_TAKEN_RATING:
-//                            ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
-//                            ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
-//                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
-//                            break;
+                        case ITEM_MOD_HIT_TAKEN_RATING:
+                            ApplyRatingMod(CR_HIT_TAKEN_MELEE, enchant_amount, apply);
+                            ApplyRatingMod(CR_HIT_TAKEN_RANGED, enchant_amount, apply);
+                            ApplyRatingMod(CR_HIT_TAKEN_SPELL, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_CRIT_TAKEN_RATING:
+                            ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
+                            ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
+                            ApplyRatingMod(CR_CRIT_TAKEN_SPELL, enchant_amount, apply);
+                            break;
                         case ITEM_MOD_RESILIENCE_RATING:
                             ApplyRatingMod(CR_CRIT_TAKEN_MELEE, enchant_amount, apply);
                             ApplyRatingMod(CR_CRIT_TAKEN_RANGED, enchant_amount, apply);
@@ -14326,8 +14361,13 @@ void Player::ApplyEnchantment(Item* item, EnchantmentSlot slot, bool apply, bool
                             HandleBaseModValue(SHIELD_BLOCK_VALUE, FLAT_MOD, float(enchant_amount), apply);
                             TC_LOG_DEBUG("entities.player.items", "+ %u BLOCK_VALUE", enchant_amount);
                             break;
-                        case ITEM_MOD_SPELL_HEALING_DONE:   // deprecated
-                        case ITEM_MOD_SPELL_DAMAGE_DONE:    // deprecated
+                        case ITEM_MOD_SPELL_HEALING_DONE:
+                            ApplyModUInt32Value(PLAYER_FIELD_MOD_HEALING_DONE_POS, enchant_amount, apply);
+                            break;
+                        case ITEM_MOD_SPELL_DAMAGE_DONE:
+                            for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
+                                ApplyModUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + i, enchant_amount, apply);
+                            break;
                         default:
                             break;
                     }
@@ -15568,10 +15608,11 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         AddPct(XP, (*i)->GetAmount());
 
     int32 moneyRew = 0;
-    if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
-        GiveXP(XP, NULL);
-    else
-        moneyRew = int32(quest->GetRewMoneyMaxLevel() * sWorld->getRate(RATE_DROP_MONEY));
+    GiveXP(XP, NULL);
+    //if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+    //    GiveXP(XP, NULL);
+    //else
+    //    moneyRew = int32(quest->GetRewMoneyMaxLevel() * sWorld->getRate(RATE_DROP_MONEY));
 
     // Give player extra money if GetRewOrReqMoney > 0 and get ReqMoney if negative
     if (quest->GetRewOrReqMoney())
@@ -18360,8 +18401,8 @@ void Player::_LoadInventory(PreparedQueryResult result, uint32 timeDiff)
             Field* fields = result->Fetch();
             if (Item* item = _LoadItem(trans, zoneId, timeDiff, fields))
             {
-                uint32 bagGuid  = fields[11].GetUInt32();
-                uint8  slot     = fields[12].GetUInt8();
+                uint32 bagGuid  = fields[12].GetUInt32();
+                uint8  slot     = fields[13].GetUInt8();
 
                 uint8 err = EQUIP_ERR_OK;
                 // Item is not in bag
@@ -18470,8 +18511,8 @@ void Player::_LoadInventory(PreparedQueryResult result, uint32 timeDiff)
 Item* Player::_LoadItem(SQLTransaction& trans, uint32 zoneId, uint32 timeDiff, Field* fields)
 {
     Item* item = NULL;
-    uint32 itemGuid  = fields[13].GetUInt32();
-    uint32 itemEntry = fields[14].GetUInt32();
+    uint32 itemGuid  = fields[14].GetUInt32();
+    uint32 itemEntry = fields[15].GetUInt32();
     if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemEntry))
     {
         bool remove = false;
@@ -18608,8 +18649,8 @@ void Player::_LoadMailedItems(Mail* mail)
     {
         Field* fields = result->Fetch();
 
-        uint32 itemGuid = fields[11].GetUInt32();
-        uint32 itemTemplate = fields[12].GetUInt32();
+        uint32 itemGuid = fields[12].GetUInt32();
+        uint32 itemTemplate = fields[13].GetUInt32();
 
         mail->AddItem(itemGuid, itemTemplate);
 
@@ -23042,8 +23083,6 @@ void Player::UpdateVisibilityForPlayer()
 void Player::InitPrimaryProfessions()
 {
     uint16 count = sWorld->getIntConfig(CONFIG_MAX_PRIMARY_TRADE_SKILL);
-    if (HasSpell(81876))
-        count += 2;
     SetFreePrimaryProfessions(count);
 }
 
@@ -24110,7 +24149,7 @@ void Player::RemoveItemDurations(Item* item)
 
 void Player::AddItemDurations(Item* item)
 {
-    if (item->GetUInt32Value(ITEM_FIELD_DURATION))
+    if (item->GetUInt32Value(ITEM_FIELD_DURATION) || item->GetTemplate()->Flags & ITEM_PROTO_FLAG_LEGACY)
     {
         m_itemDuration.push_back(item);
         item->SendTimeUpdate(this);
@@ -24310,7 +24349,12 @@ bool Player::isHonorOrXPTarget(Unit* victim) const
             victim->ToCreature()->IsPet() ||
             victim->ToCreature()->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_XP_AT_KILL)
                 return false;
+
+        if (victim->ToCreature()->GetCreatureTemplate()->expansion == 0 &&
+            victim->ToCreature()->GetCreatureTemplate()->minlevel > 63)
+            return false;
     }
+
     return true;
 }
 
@@ -25327,6 +25371,7 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         --loot->unlootedCount;
 
         SendNewItem(newitem, uint32(item->count), false, false, true);
+        AddLootCooldown(item->itemid);
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_ITEM, item->itemid, item->count);
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_TYPE, loot->loot_type, item->count);
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LOOT_EPIC_ITEM, item->itemid, item->count);
@@ -27420,7 +27465,7 @@ void Player::_LoadSupremacyStats(uint32 guid)
 
 void Player::_LoadCollectedMemory(uint32 guid)
 {
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_COLLECTED_MEMORY);
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MEMORY);
     stmt->setUInt32(0, guid);
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (result)
@@ -27428,7 +27473,7 @@ void Player::_LoadCollectedMemory(uint32 guid)
         do 
         {
             Field* fields = result->Fetch();
-            m_CollectedMemorySet.insert(fields[0].GetInt32());
+            m_CollectedMemoryMap[fields[0].GetUInt32()] = fields[1].GetBool();
         } while (result->NextRow());
     }
 }
@@ -27738,23 +27783,15 @@ void Player::TryCompound()
 
     uint8 bag = compounder->GetSlot();
 
-    Reagent reagent;
+    CompoundReagentItem reagent;
 
     bool empty = true;
     for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
     {
         Item* item = GetItemByPos(bag, i);
+        reagent.reagent[i] = item;
         if (item)
-        {
-            reagent.reagent[i] = item->GetEntry();
-            reagent.count[i] = item->GetCount();
             empty = false;
-        }
-        else
-        {
-            reagent.reagent[i] = 0;
-            reagent.count[i] = 0;
-        }
     }
 
     if (empty)
@@ -27762,416 +27799,83 @@ void Player::TryCompound()
         ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(45).c_str());
         return;
     }
+    else
+        xCompoundingMgr->ProcessCompound(this, reagent);
+}
 
-    bool done = false;
-
-    const ItemTemplate* itemProto = sObjectMgr->GetItemTemplate(reagent.reagent[0]);
-
-    if (itemProto && itemProto->Quality == ITEM_QUALITY_POOR)
+void Player::TryRecycle()
+{
+    Item* compounder = GetCompoundContainer();
+    if (!compounder)
     {
-        xCompoundingMgr->StackReagents(reagent);
-
-        uint32 amount = xCompoundingMgr->CalculateRecycleAmount(reagent);
-        if (amount)
-        {
-            //take reagents
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (reagent.reagent[i])
-                {
-                    int32 reagentCount = reagent.count[i];
-                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j) // skip 1st slot
-                    {
-                        if (reagentCount > 0)
-                        {
-                            Item* item = GetItemByPos(bag, j);
-                            if (item && item->GetEntry() == reagent.reagent[i])
-                            {
-                                if (item->GetCount() > (uint32)reagentCount)
-                                {
-                                    item->SetCount(item->GetCount() - reagentCount);
-                                    break;
-                                }
-                                else
-                                {
-                                    reagentCount -= item->GetCount();
-                                    DestroyItem(bag, j, true);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // attempt store
-            ItemPosCountVec sDest;
-            // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
-            InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, 60319, amount);
-            if (msg == EQUIP_ERR_OK)
-                StoreNewItem(sDest, 60319, true);
-            else
-            {
-                SQLTransaction trans = CharacterDatabase.BeginTransaction();
-                MailDraft draft = MailDraft(295);
-                Item* item = Item::CreateItem(60319, amount, this);
-                if (item)
-                {
-                    item->SaveToDB(trans);
-                    draft.AddItem(item);
-                }
-                draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
-                CharacterDatabase.CommitTransaction(trans);
-            }
-
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(50).c_str());
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (reagent.reagent[i])
-                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(reagent.reagent[i]).c_str(), reagent.count[i]).c_str());
-            }
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(51).c_str());
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(60319).c_str(), amount).c_str());
-
-            done = true;
-        }
+        std::string name = ItemChatLink::FormatName(57373);
+        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(65, name.c_str()).c_str());
+        return;
     }
 
-    if (itemProto && (itemProto->Class == ITEM_CLASS_WEAPON || itemProto->Class == ITEM_CLASS_ARMOR)) // enchant
+    uint8 bag = compounder->GetSlot();
+
+    uint32 totalSellPrice = 0;
+
+    bool empty = true;
+    for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
     {
-        xCompoundingMgr->StackReagents(reagent);
-
-        const EnchantCompound* compound = xCompoundingMgr->TryEnchantCompound(this, itemProto, reagent);
-        if (compound)
-        {
-            //take reagents
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (compound->reagent[i])
-                {
-                    int32 reagentCount = compound->count[i];
-                    for (uint8 j = 1; j != MAX_COMPOUND_REAGENT; ++j) // skip 1st slot
-                    {
-                        if (reagentCount > 0)
-                        {
-                            Item* item = GetItemByPos(bag, j);
-                            if (item && item->GetEntry() == compound->reagent[i])
-                            {
-                                if (item->GetCount() > (uint32)reagentCount)
-                                {
-                                    item->SetCount(item->GetCount() - reagentCount);
-                                    break;
-                                }
-                                else
-                                {
-                                    reagentCount -= item->GetCount();
-                                    DestroyItem(bag, j, true);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item* item = GetItemByPos(bag, 0);
-
-            if (compound->duration)
-            {
-                ApplyEnchantment(item, TEMP_ENCHANTMENT_SLOT, false);
-                item->SetEnchantment(TEMP_ENCHANTMENT_SLOT, compound->enchant, compound->duration, 0);
-                ApplyEnchantment(item, TEMP_ENCHANTMENT_SLOT, true);
-            }
-            else
-            {
-                ApplyEnchantment(item, PERM_ENCHANTMENT_SLOT, false);
-                item->SetEnchantment(PERM_ENCHANTMENT_SLOT, compound->enchant, 0, 0);
-                ApplyEnchantment(item, PERM_ENCHANTMENT_SLOT, true);
-            }
-
-            std::string name = ItemChatLink::FormatName(itemProto->ItemId);
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(47, name.c_str()).c_str());
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (compound->reagent[i])
-                {
-                    std::string reagentName = ItemChatLink::FormatName(compound->reagent[i]);
-                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, reagentName.c_str(), compound->count[i]).c_str());
-                }
-            }
-
-            if (HasSkill(SKILL_ENCHANTING))
-                UpdateSkillPro(SKILL_ENCHANTING, 200, 1);
-
-            done = true;
-        }
-    }
-
-    if (!done && itemProto && xCompoundingMgr->IsSocketStone(itemProto))
-    {
-        Item* item = GetItemByPos(bag, 1);
+        Item* item = GetItemByPos(bag, i);
         if (item)
         {
-            const ItemTemplate* equipment = item->GetTemplate();
-            if (equipment && (equipment->Class == ITEM_CLASS_WEAPON || equipment->Class == ITEM_CLASS_ARMOR))
-            {
-                uint32 socketSlot = 0;
-                if (equipment->Socket[0].Color)
-                    socketSlot++;
-                if (equipment->Socket[1].Color)
-                    socketSlot++;
-                if (equipment->Socket[2].Color)
-                    socketSlot++;
-                if (socketSlot < 2)
-                {
-                    xCompoundingMgr->StackReagents(reagent);
-
-                    const SocketCompound* compound = xCompoundingMgr->TrySocketCompound(this, itemProto, reagent);
-                    {
-                        if (compound)
-                        {
-                            xCompoundingMgr->PickSocketReagent(compound, reagent);
-
-                            //take reagents
-                            int32 reagentCount = compound->count;
-                            for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
-                            {
-                                if (reagentCount > 0)
-                                {
-                                    Item* item = GetItemByPos(bag, j);
-                                    if (item && item->GetEntry() == compound->stone)
-                                    {
-                                        if (item->GetCount() > (uint32)reagentCount)
-                                        {
-                                            item->SetCount(item->GetCount() - reagentCount);
-                                            break;
-                                        }
-                                        else
-                                        {
-                                            reagentCount -= item->GetCount();
-                                            DestroyItem(bag, j, true);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // socket item
-                            ApplyEnchantment(item, PRISMATIC_ENCHANTMENT_SLOT, false);
-                            item->SetEnchantment(PRISMATIC_ENCHANTMENT_SLOT, 6770, 0, 0);
-                            ApplyEnchantment(item, PRISMATIC_ENCHANTMENT_SLOT, true);
-
-                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(48, ItemChatLink::FormatName(equipment->ItemId).c_str()).c_str());
-                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
-                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, ItemChatLink::FormatName(itemProto->ItemId).c_str(), compound->count).c_str());
-
-                            done = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    if (!done && itemProto && xCompoundingMgr->IsRawStone(itemProto)) // gem
-    {
-        xCompoundingMgr->StackReagents(reagent);
-
-        const GemCompound* compound = xCompoundingMgr->TryGemCompound(this, reagent);
-        if (compound)
-        {
-            xCompoundingMgr->PickGemReagent(compound, reagent);
-
-            //take reagents
-            int32 reagentCount = compound->count;
-            for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
-            {
-                if (reagentCount > 0)
-                {
-                    Item* item = GetItemByPos(bag, j);
-                    if (item && item->GetEntry() == compound->rawStone)
-                    {
-                        if (item->GetCount() > (uint32)reagentCount)
-                        {
-                            item->SetCount(item->GetCount() - reagentCount);
-                            break;
-                        }
-                        else
-                        {
-                            reagentCount -= item->GetCount();
-                            DestroyItem(bag, j, true);
-                        }
-                    }
-                }
-            }
-
-            // step gemcrafting skill
-            if (HasSkill(SKILL_JEWELCRAFTING))
-                UpdateSkillPro(SKILL_JEWELCRAFTING, 200, 1);
-
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(41).c_str());
-            // attempt store
-            ItemPosCountVec sDest;
-            // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
-            InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, compound->gem, 1);
-            if (msg == EQUIP_ERR_OK)
-            {
-                StoreNewItem(sDest, compound->gem, true);
-                if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->gem))
-                {
-                    std::string name = ItemChatLink::FormatName(compound->gem);
-                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), 1).c_str());
-                }
-            }
-            else
-            {
-                SQLTransaction trans = CharacterDatabase.BeginTransaction();
-                MailDraft draft = MailDraft(295);
-                Item* item = Item::CreateItem(compound->gem, 1, this);
-                if (item)
-                {
-                    item->SaveToDB(trans);
-                    draft.AddItem(item);
-                }
-                draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
-                CharacterDatabase.CommitTransaction(trans);
-
-                if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->gem))
-                {
-                    std::string name = ItemChatLink::FormatName(compound->gem);
-                    ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), 1).c_str());
-                }
-            }
-
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
-
-            if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->rawStone))
-            {
-                std::string name = ItemChatLink::FormatName(compound->rawStone);
-                ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->count).c_str());
-            }
-
-            done = true;
+            totalSellPrice += item->GetTemplate()->SellPrice * item->GetCount();
+            empty = false;
         }
     }
 
-    if (!done) // recipe
+    if (empty)
     {
-        xCompoundingMgr->StackReagents(reagent);
+        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(63).c_str());
+        return;
+    }
 
-        const RecipeCompound* compound = xCompoundingMgr->TryRecipeCompound(this, reagent);
+    if (totalSellPrice < 1250)
+    {
+        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(64).c_str());
+        return;
+    }
 
-        if (compound)
+    uint32 count = CalculatePct(totalSellPrice / 125, urand(50, 150));
+
+    for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
+        DestroyItem(bag, i, true);
+
+    // attempt store
+    ItemPosCountVec sDest;
+    // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
+    InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, 60319, count);
+    if (msg == EQUIP_ERR_OK)
+    {
+        StoreNewItem(sDest, 60319, true);
+        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(60319))
         {
-            // check phase
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (compound->reagent[i])
-                {
-                    int32 reagentCount = compound->reagentCount[i];
-                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
-                    {
-                        Item* item = GetItemByPos(bag, j);
-                        if (item && item->GetEntry() == compound->reagent[i])
-                            reagentCount -= item->GetCount();
-                    }
-                    if (reagentCount > 0)
-                        return;
-                }
-            }
-
-            //take reagents
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (compound->reagent[i])
-                {
-                    int32 reagentCount = compound->reagentCount[i];
-                    for (uint8 j = 0; j != MAX_COMPOUND_REAGENT; ++j)
-                    {
-                        if (reagentCount > 0)
-                        {
-                            Item* item = GetItemByPos(bag, j);
-                            if (item && item->GetEntry() == compound->reagent[i])
-                            {
-                                if (item->GetCount() > (uint32)reagentCount)
-                                {
-                                    item->SetCount(item->GetCount() - reagentCount);
-                                    break;
-                                }
-                                else
-                                {
-                                    reagentCount -= item->GetCount();
-                                    DestroyItem(bag, j, true);
-                                }
-
-                            }
-                        }
-                    }
-                }
-            }
-
-            // step skill if possible
-            if (compound->reqSkill && HasSkill(compound->reqSkill))
-            {
-                if (GetSkillValue(compound->reqSkill) < compound->skillUpYellow)
-                    UpdateSkillPro(compound->reqSkill, 1000, 1);
-                else if (GetSkillValue(compound->reqSkill) < compound->skillUpGreen)
-                    UpdateSkillPro(compound->reqSkill, 250, 1);
-            }
-
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(41).c_str());
-            for (uint8 i = 0; i != MAX_COMPOUND_ITEM; ++i)
-            {
-                if (compound->item[i])
-                {
-                    // attempt store
-                    ItemPosCountVec sDest;
-                    // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
-                    InventoryResult msg = CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, compound->item[i], compound->itemCount[i]);
-                    if (msg == EQUIP_ERR_OK)
-                    {
-                        StoreNewItem(sDest, compound->item[i], true, Item::GenerateItemRandomPropertyId(compound->item[i]));
-                        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->item[i]))
-                        {
-                            std::string name = ItemChatLink::FormatName(compound->item[i]);
-                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->itemCount[i]).c_str());
-                        }
-                    }
-                    else
-                    {
-                        SQLTransaction trans = CharacterDatabase.BeginTransaction();
-                        MailDraft draft = MailDraft(295);
-                        Item* item = Item::CreateItem(compound->item[i], compound->itemCount[i], this);
-                        if (item)
-                        {
-                            item->SaveToDB(trans);
-                            draft.AddItem(item);
-                        }
-                        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
-                        CharacterDatabase.CommitTransaction(trans);
-
-                        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->item[i]))
-                        {
-                            std::string name = ItemChatLink::FormatName(compound->item[i]);
-                            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->itemCount[i]).c_str());
-                        }
-                    }
-                }
-            }
-
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(43).c_str());
-            for (uint8 i = 0; i != MAX_COMPOUND_REAGENT; ++i)
-            {
-                if (compound->reagent[i])
-                {
-                    if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(compound->reagent[i]))
-                    {
-                        std::string name = ItemChatLink::FormatName(compound->reagent[i]);
-                        ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(42, name.c_str(), compound->reagentCount[i]).c_str());
-                    }
-                }
-            }
+            std::string name = ItemChatLink::FormatName(60319);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(66, count, name.c_str()).c_str());
         }
-        else
-            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(44).c_str());
+    }
+    else
+    {
+        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+        MailDraft draft = MailDraft(295);
+        Item* item = Item::CreateItem(60319, count, this);
+        if (item)
+        {
+            item->SaveToDB(trans);
+            draft.AddItem(item);
+        }
+        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, 43339));
+        CharacterDatabase.CommitTransaction(trans);
+
+        if (const ItemTemplate* proto = sObjectMgr->GetItemTemplate(60319))
+        {
+            std::string name = ItemChatLink::FormatName(60319);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(66, count, name.c_str()).c_str());
+        }
     }
 }
 
@@ -28190,28 +27894,149 @@ bool Player::CanSeeOrDetectEx(WorldObject const* obj, bool ignoreStealth /* = fa
 {
     if (const Creature* creature = obj->ToCreature())
     {
-        int32 entry = creature->GetEntry();
-        if (sObjectMgr->IsMemoryCollector(entry) && MemoryCollected(entry))
+        uint32 memory = creature->GetCreatureTemplate()->Memory;
+        if (memory && MemoryCollected(memory) && !IsGameMaster())
             return false;
     }
 
     return CanSeeOrDetect(obj, ignoreStealth, distanceCheck);
 }
 
-bool Player::MemoryCollected(int32 entry) const
+bool Player::MemoryCollected(uint32 memory) const
 {
-    CollectedMemorySet::const_iterator itr = m_CollectedMemorySet.find(entry);
-    return itr != m_CollectedMemorySet.end();
+    CollectedMemoryMap::const_iterator itr = m_CollectedMemoryMap.find(memory);
+    if (itr != m_CollectedMemoryMap.end())
+        return (*itr).second;
+    return false;
 }
 
-void Player::SaveCollectedMemory(int32 memory)
+void Player::CollectMemory(uint32 memory, bool collected/* = true*/)
 {
-    m_CollectedMemorySet.insert(memory);
+    m_CollectedMemoryMap[memory] = collected;
     UpdateVisibilityForPlayer();
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_COLLECTED_MEMORY);
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_MEMORY);
     stmt->setUInt32(0, GetGUID());
     stmt->setInt32(1, memory);
+    stmt->setBool(2, collected);
     CharacterDatabase.Execute(stmt);
+}
+
+void Player::CollectMemoryAtLogin()
+{
+    for (CollectedMemoryMap::iterator itr = m_CollectedMemoryMap.begin(); itr != m_CollectedMemoryMap.end(); ++itr)
+    {
+        if (!itr->second)
+        {
+            const CollectableMemory* memory = xMemoryMgr->GetCollectableMemory(itr->first);
+            if (memory)
+                CollectMemory(memory, false);
+        }
+    }
+
+    // account memory
+    xMemoryMgr->CollectAccountMemory(this);
+}
+
+void Player::CollectMemory(const CollectableMemory* memory, bool announce /* = true */)
+{
+    CollectMemory(memory->id, true);
+
+    if (memory->rewardItem)
+    {
+        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+        MailDraft draft = MailDraft(memory->mail);
+        Item* item = Item::CreateItem(memory->rewardItem, memory->rewardItemCount, this);
+        if (item)
+        {
+            item->SaveToDB(trans);
+            draft.AddItem(item);
+        }
+        draft.SendMailTo(trans, this, MailSender(MAIL_CREATURE, memory->sender));
+        CharacterDatabase.CommitTransaction(trans);
+        if (announce)
+        {
+            std::string name = ItemChatLink::FormatName(memory->rewardItem);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
+        }
+    }
+
+    if (memory->rewardSpell)
+    {
+        LearnSpell(memory->rewardSpell, false);
+        if (announce)
+        {
+            std::string name = SpellChatLink::FormatName(memory->rewardSpell);
+            ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
+        }
+    }
+}
+
+void Player::UpdateLegacyItems(uint32 diff)
+{
+    for (uint8 i = EQUIPMENT_SLOT_START; i != EQUIPMENT_SLOT_END; ++i)
+    {
+        if (Item* item = GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+        {
+            if (item->IsLegacy())
+                item->Update(diff);
+        }
+    }
+}
+
+void Player::LoadLootCooldown()
+{
+    m_AccountLootCooldownMap.clear();
+
+    PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_ACCOUNT_LOOT_COOLDOWN);
+    stmt->setUInt32(0, GetSession()->GetAccountId());
+    PreparedQueryResult result = LoginDatabase.Query(stmt);
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            m_AccountLootCooldownMap[fields[0].GetUInt32()] = fields[1].GetUInt32();
+        } while (result->NextRow());
+    }
+}
+
+bool Player::HasLootCooldown(uint32 item) const
+{
+    AccountLootCooldownMap::const_iterator itr = m_AccountLootCooldownMap.find(item);
+    if (itr == m_AccountLootCooldownMap.end())
+        return false;
+    return itr->second == 0;
+}
+
+void Player::AddLootCooldown(uint32 item)
+{
+    if (uint32 cooldown = xLegacyMgr->GetLootCooldown(item))
+        m_AccountLootCooldownMap[item] = cooldown;
+}
+
+void Player::RemoveLootCooldown(uint32 item)
+{
+    AccountLootCooldownMap::iterator itr = m_AccountLootCooldownMap.find(item);
+    if (itr != m_AccountLootCooldownMap.end())
+        m_AccountLootCooldownMap.erase(itr);
+}
+
+void Player::UpdateLootCooldown(uint32 diff)
+{
+    // don't remove cooldown here, itll be cleared at login stage.
+    for (AccountLootCooldownMap::iterator itr = m_AccountLootCooldownMap.begin(); itr != m_AccountLootCooldownMap.end(); ++itr)
+    {
+        if (itr->second)
+        {
+            if (itr->second >= diff)
+            {
+                itr->second -= diff;
+                continue;
+            }
+            else
+                itr->second = 0;
+        }
+    }
 }
 
 bool Player::ValidateAppearance(uint8 race, uint8 class_, uint8 gender, uint8 hairID, uint8 hairColor, uint8 faceID, uint8 facialHair, uint8 skinColor, bool create /*=false*/)

@@ -862,6 +862,34 @@ class spell_warr_vigilance_trigger : public SpellScriptLoader
         }
 };
 
+// 871
+class spell_warr_shield_wall : public SpellScriptLoader
+{
+public:
+    spell_warr_shield_wall() : SpellScriptLoader("spell_warr_shield_wall") {}
+
+    class spell_warr_shield_wall_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_warr_shield_wall_AuraScript);
+
+        void HandleEffectApply(AuraEffect const* aurEff, AuraEffectHandleModes mode)
+        {
+            if (GetCaster()->HasAura(81908))
+                GetCaster()->CastSpell(GetCaster(), 81911, true);
+        }
+
+        void Register() override
+        {
+            OnEffectApply += AuraEffectApplyFn(spell_warr_shield_wall_AuraScript::HandleEffectApply, EFFECT_0, SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_warr_shield_wall_AuraScript();
+    }
+};
+
 void AddSC_warrior_spell_scripts()
 {
     new spell_warr_bloodthirst();
@@ -883,4 +911,5 @@ void AddSC_warrior_spell_scripts()
     new spell_warr_sweeping_strikes();
     new spell_warr_vigilance();
     new spell_warr_vigilance_trigger();
+    new spell_warr_shield_wall();
 }

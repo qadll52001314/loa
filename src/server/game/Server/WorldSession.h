@@ -142,14 +142,6 @@ enum DeclinedNameResult
     DECLINED_NAMES_RESULT_ERROR   = 1
 };
 
-//struct LegacyItem
-//{
-//    uint32 entry;
-//    bool available;
-//};
-//
-//typedef std::vector<LegacyItem> LegacyItemList;
-
 //class to deal with packet processing
 //allows to determine if next packet is safe to be processed
 class PacketFilter
@@ -985,8 +977,6 @@ class WorldSession
         QueryCallback<PreparedQueryResult, ObjectGuid> _sendStabledPetCallback;
         QueryCallback<PreparedQueryResult, CharacterCreateInfo*, true> _charCreateCallback;
         QueryResultHolderFuture _charLoginCallback;
-
-        //LegacyItemList m_legacyItems;
 
     friend class World;
     protected:

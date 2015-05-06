@@ -4354,6 +4354,40 @@ void Spell::TakePower()
         return;
     }
 
+    if (m_caster->HasAura(81891))
+    {
+        Player* player = m_caster->ToPlayer();
+        Item* ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
+        if (ring && ring->GetEntry() == 315124)
+        {
+            uint32 blueGemCount = 0;
+            if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT) == 8)
+                blueGemCount++;
+            if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_2) == 8)
+                blueGemCount++;
+            if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_3) == 8)
+                blueGemCount++;
+            if (urand(0, 100) < blueGemCount * sSpellMgr->GetSpellInfo(81891)->Effects[0].CalcValue())
+                return;
+        }
+        else
+        {
+            ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2);
+            if (ring && ring->GetEntry() == 315124)
+            {
+                uint32 blueGemCount = 0;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT) == 8)
+                    blueGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_2) == 8)
+                    blueGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_3) == 8)
+                    blueGemCount++;
+                if (urand(0, 100) < blueGemCount * sSpellMgr->GetSpellInfo(81891)->Effects[0].CalcValue())
+                    return;
+            }
+        }
+    }
+
     if (hit)
         m_caster->ModifyPower(powerType, -m_powerCost);
     else

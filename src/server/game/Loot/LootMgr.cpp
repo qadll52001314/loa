@@ -364,6 +364,7 @@ LootItem::LootItem(LootStoreItem const& li)
 
     needs_quest = li.needs_quest;
 
+    itemid = Item::RollLegacy(itemid, 5.0f);
     randomSuffix = GenerateEnchSuffixFactor(itemid);
     randomPropertyId = Item::GenerateItemRandomPropertyId(itemid);
     count = 0;
@@ -1876,4 +1877,58 @@ void LoadLootTemplates_Reference()
     LootTemplates_Reference.ReportUnusedIds(lootIdSet);
 
     TC_LOG_INFO("server.loading", ">> Loaded refence loot templates in %u ms", GetMSTimeDiffToNow(oldMSTime));
+}
+
+void Loot::GenerateCustomCreatureLoot(Player* player, Creature* creature)
+{
+    const CreatureTemplate* creatureTemplate = creature->GetCreatureTemplate();
+    uint32 itemid = 60319;
+    float chance = 0.0f;
+    uint32 stackSize = 1000;
+    uint32 count = (creatureTemplate->minlevel + creatureTemplate->maxlevel) / 2;
+    switch (creatureTemplate->rank)
+    {
+        case CREATURE_ELITE_NORMAL:
+            chance = 5.0f;
+            break;
+        case CREATURE_ELITE_ELITE:
+            chance = 15.0f;
+            count *= 2;
+            break;
+        case CREATURE_ELITE_RARE:
+            chance = 100.0f;
+            count *= 5;
+            break;
+        case CREATURE_ELITE_RAREELITE:
+            chance = 100.0f;
+            count *= 20;
+            break;
+        case CREATURE_ELITE_WORLDBOSS:
+            chance = 100.0f;
+            count *= 100;
+            break;
+        default:
+            return;
+    }
+    count *= frand(0.8f, 1.2f);
+    if (count && frand(0, 100.0f) < chance)
+    {
+        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemid);
+        if (!proto)
+            return;
+
+        uint32 stacks = std::ceil(count / stackSize);
+
+        std::vector<LootItem>& lootItems = items;
+        uint32 limit = MAX_NR_LOOT_ITEMS;
+
+        for (uint32 i = 0; i < stacks && lootItems.size() < limit; ++i)
+        {
+            LootItem generatedLoot;
+            generatedLoot.itemid = itemid;
+            generatedLoot.count = std::min(count, stackSize);
+            lootItems.push_back(generatedLoot);
+            count -= proto->GetMaxStackSize();
+        }
+    }
 }

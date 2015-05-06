@@ -1431,11 +1431,7 @@ class ObjectMgr
         const SpecSkillDataMap* GetSpecSkillDataMap() { return &m_SpecSkillDataMap; }
         const SpecSkillTierMap* GetSpecSkillMap() const { return &m_SpecSkillTierMap; }
         const SpecSkillTier* GetSpecSkillTier(uint32 tier) const;
-        const MemoryCollector* GetMemoryCollector(int32 entry) const;
-        void LoadMemoryCollector();
-        bool IsMemoryCollector(int32 entry) const;
     private:
-        MemoryCollectorMap m_MemoryCollectorMap;
 
         MailLevelRewardContainer _mailLevelRewardStore;
 

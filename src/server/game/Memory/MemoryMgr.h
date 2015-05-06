@@ -6,17 +6,14 @@
 struct CollectableMemory
 {
     uint32 id;
-    uint32 item;
-    uint32 itemCount;
-    uint32 spell;
+    uint32 reqItem;
+    uint32 reqItemCount;
+    uint32 rewardItem;
+    uint32 rewardItemCount;
+    uint32 rewardSpell;
     uint32 mail;
     uint32 sender;
-};
-
-struct CharacterCollectableMemory
-{
-    uint32 memory;
-    bool collected;
+    uint32 text;
 };
 
 struct MemoryCode
@@ -29,10 +26,7 @@ struct MemoryCode
 
 typedef std::map<uint32, CollectableMemory> CollectableMemoryMap;
 typedef std::multimap<int32, uint32> AccountCollectedMemoryMap;
-typedef std::multimap<int32, CharacterCollectableMemory> CharacterCollectedMemoryMap;
 typedef std::pair<AccountCollectedMemoryMap::const_iterator, AccountCollectedMemoryMap::const_iterator> AccountCollectableMemoryConstBounds;
-typedef std::pair<CharacterCollectedMemoryMap::const_iterator, CharacterCollectedMemoryMap::const_iterator> CharacterCollectableMemoryConstBounds;
-typedef std::pair<CharacterCollectedMemoryMap::iterator, CharacterCollectedMemoryMap::iterator> CharacterCollectableMemoryBounds;
 typedef std::map<std::string, MemoryCode> MemoryCodeMap;
 
 class MemoryMgr
@@ -48,19 +42,14 @@ public:
 
     void LoadDefine();
     const CollectableMemory* GetCollectableMemory(uint32 entry) const;
-    void CollectMemory(Player* player);
-    void CollectMemory(uint32 character, uint32 memory);
-    bool CharacterCollected(uint32 character, uint32 memory) const;
+    void CollectAccountMemory(Player* player);
     AccountCollectableMemoryConstBounds GetAccountCollectableMemoryConstBounds(uint32 account) const;
-    CharacterCollectableMemoryConstBounds GetCharacterCollectableMemoryConstBounds(uint32 character) const;
-    CharacterCollectableMemoryBounds GetCharacterCollectableMemoryBounds(uint32 character);
     void FetchMemoryFromCode(Player* player, std::string code);
-    void SendMemoryMail(Player* player, const CollectableMemory* memory) const;
+    void AddMemoryCode(std::string code, uint32 memory, uint32 count, uint32 item, uint32 itemCount, std::string comment);
 
 private:
     CollectableMemoryMap m_CollectableMemoryMap;
     AccountCollectedMemoryMap m_AccountCollectedMemoryMap;
-    CharacterCollectedMemoryMap m_CharacterCollectedMemoryMap;
     MemoryCodeMap m_MemoryCodeMap;
 };
 

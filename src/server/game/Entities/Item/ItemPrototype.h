@@ -110,7 +110,7 @@ enum ItemProtoFlags
     ITEM_PROTO_FLAG_UNK1                        = 0x00000001, // ?
     ITEM_PROTO_FLAG_CONJURED                    = 0x00000002, // Conjured item
     ITEM_PROTO_FLAG_OPENABLE                    = 0x00000004, // Item can be right clicked to open for loot
-    ITEM_PROTO_FLAG_HEROIC                      = 0x00000008, // Makes green "Heroic" text appear on item
+    ITEM_PROTO_FLAG_LEGACY                      = 0x00000008, // Makes green "Heroic" text appear on item
     ITEM_PROTO_FLAG_DEPRECATED                  = 0x00000010, // Cannot equip or use
     ITEM_PROTO_FLAG_INDESTRUCTIBLE              = 0x00000020, // Item can not be destroyed, except by using spell (item can be reagent for spell)
     ITEM_PROTO_FLAG_UNK2                        = 0x00000040, // ?

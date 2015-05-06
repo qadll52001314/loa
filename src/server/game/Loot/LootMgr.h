@@ -384,6 +384,7 @@ struct Loot
     uint32 GetMaxSlotInLootFor(Player* player) const;
     bool hasItemFor(Player* player) const;
     bool hasOverThresholdItem() const;
+    void GenerateCustomCreatureLoot(Player* player, Creature* creature);
 
     private:
         void FillNotNormalLootFor(Player* player, bool presentAtLooting);

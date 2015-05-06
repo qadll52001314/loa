@@ -2629,6 +2629,351 @@ public:
     }
 };
 
+#define HELLFIRE_RING_ENTRY 315124
+
+// 81890
+class spell_item_hellfire_ring_damage_proc : public SpellScriptLoader
+{
+public:
+    spell_item_hellfire_ring_damage_proc() : SpellScriptLoader("spell_item_hellfire_ring_damage_proc") {}
+
+    class spell_item_hellfire_ring_damage_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_hellfire_ring_damage_proc_AuraScript);
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            Unit* target = procInfo.GetProcTarget();
+            int32 damage = procInfo.GetDamageInfo()->GetDamage();
+            if (damage)
+            {
+                Item* ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
+                if (!ring || ring->GetEntry() != HELLFIRE_RING_ENTRY)
+                    ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2);
+                if (!ring || ring->GetEntry() != HELLFIRE_RING_ENTRY)
+                    return;
+
+                uint32 redGemCount = 0;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT) == 2)
+                    redGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_2) == 2)
+                    redGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_3) == 2)
+                    redGemCount++;
+
+                if (urand(0, 100) < redGemCount * GetSpellInfo()->Effects[0].CalcValue())
+                    player->CastCustomSpell(target, 81895, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            AfterEffectProc += AuraEffectProcFn(spell_item_hellfire_ring_damage_proc_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_hellfire_ring_damage_proc_AuraScript();
+    }
+};
+
+// 81892
+class spell_item_hellfire_ring_heal_proc : public SpellScriptLoader
+{
+public:
+    spell_item_hellfire_ring_heal_proc() : SpellScriptLoader("spell_item_hellfire_ring_heal_proc") {}
+
+    class spell_item_hellfire_ring_heal_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_hellfire_ring_heal_proc_AuraScript);
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            Unit* target = procInfo.GetProcTarget();
+            int32 damage = procInfo.GetDamageInfo()->GetDamage();
+            if (damage)
+            {
+                Item* ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER1);
+                if (!ring || ring->GetEntry() != HELLFIRE_RING_ENTRY)
+                    ring = player->GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_FINGER2);
+                if (!ring || ring->GetEntry() != HELLFIRE_RING_ENTRY)
+                    return;
+
+                uint32 yellowGemCount = 0;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT) == 4)
+                    yellowGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_2) == 4)
+                    yellowGemCount++;
+                if (ring->GetGemColor(SOCK_ENCHANTMENT_SLOT_3) == 4)
+                    yellowGemCount++;
+
+                if (urand(0, 100) < yellowGemCount * GetSpellInfo()->Effects[0].CalcValue())
+                    player->CastCustomSpell(target, 81896, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            AfterEffectProc += AuraEffectProcFn(spell_item_hellfire_ring_heal_proc_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_hellfire_ring_heal_proc_AuraScript();
+    }
+};
+
+// 81897
+class spell_item_levelup_to : public SpellScriptLoader
+{
+public:
+    spell_item_levelup_to() : SpellScriptLoader("spell_item_levelup_to") {}
+
+    class spell_item_levelup_to_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_levelup_to_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 level = GetSpellInfo()->Effects[0].CalcValue();
+            player->GiveLevel(level);
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_levelup_to_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_levelup_to_SpellScript();
+    }
+};
+
+// 81901
+class spell_item_edge_of_madness : public SpellScriptLoader
+{
+public:
+    spell_item_edge_of_madness() : SpellScriptLoader("spell_item_edge_of_madness") {}
+
+    class spell_item_edge_of_madness_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_edge_of_madness_AuraScript);
+
+        void HandlePeriodic(AuraEffect const* aurEff)
+        {
+            Unit* caster = GetCaster();
+            if (caster->GetHealthPct() > 20)
+            {
+                int32 damage = CalculatePct(caster->GetMaxHealth(), GetSpellInfo()->Effects[2].CalcValue());
+                caster->CastCustomSpell(caster, 81902, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectPeriodic += AuraEffectPeriodicFn(spell_item_edge_of_madness_AuraScript::HandlePeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_edge_of_madness_AuraScript();
+    }
+};
+
+// 81910
+class spell_item_blade_bulwark : public SpellScriptLoader
+{
+public:
+    spell_item_blade_bulwark() : SpellScriptLoader("spell_item_blade_bulwark") {}
+
+    class spell_item_blade_bulwark_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_blade_bulwark_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            int32 damage = CalculatePct(player->GetShieldBlockValue(), aurEff->GetAmount());
+            player->CastCustomSpell(procInfo.GetProcTarget(), 81912, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_blade_bulwark_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_blade_bulwark_AuraScript();
+    }
+};
+
+// 81913
+class spell_item_edge_of_madness_heal : public SpellScriptLoader
+{
+public:
+    spell_item_edge_of_madness_heal() : SpellScriptLoader("spell_item_edge_of_madness_heal") {}
+
+    class spell_item_edge_of_madness_heal_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_edge_of_madness_heal_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            if (caster->GetHealthPct() > 50)
+                return;
+
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), 51 - caster->GetHealthPct());
+            caster->CastCustomSpell(caster, 81914, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_edge_of_madness_heal_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_edge_of_madness_heal_AuraScript();
+    }
+};
+
+// 
+class spell_item_give_xp : public SpellScriptLoader
+{
+public:
+    spell_item_give_xp() : SpellScriptLoader("spell_item_give_xp") {}
+
+    class spell_item_give_xp_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_give_xp_SpellScript);
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                int32 xp = GetSpellInfo()->Effects[0].CalcValue();
+                player->GiveXP(xp, NULL);
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_give_xp_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_give_xp_SpellScript();
+    }
+};
+
+class spell_item_hexentanz_energy_convert : public SpellScriptLoader
+{
+public:
+    spell_item_hexentanz_energy_convert() : SpellScriptLoader("spell_item_hexentanz_energy_convert") {}
+
+    class spell_item_hexentanz_energy_convert_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_hexentanz_energy_convert_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            const SpellInfo* spell = GetSpellInfo();
+            int32 damage = caster->GetHealthPct() < spell->Effects[0].CalcValue() ? 0 : CalculatePct(caster->GetHealth(), spell->Effects[0].CalcValue());
+            int32 energy = spell->Effects[0].MiscValue;
+            caster->CastCustomSpell(caster, 81918, &damage, &energy, NULL, true);
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_hexentanz_energy_convert_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_hexentanz_energy_convert_AuraScript();
+    }
+};
+
+// 81385
+class spell_item_nahemarr_proc : public SpellScriptLoader
+{
+public:
+    spell_item_nahemarr_proc() : SpellScriptLoader("spell_item_nahemarr_proc") {}
+
+    class spell_item_nahemarr_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_nahemarr_proc_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            if (!caster->HasAura(81386))
+            {
+                int32 damage = CalculatePct(caster->GetTotalAttackPowerValue(BASE_ATTACK), GetSpellInfo()->Effects[0].CalcValue());
+                caster->CastCustomSpell(procInfo.GetProcTarget(), 81387, &damage, NULL, NULL, true);
+            }
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_nahemarr_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_nahemarr_proc_AuraScript();
+    }
+};
+
+// 81386
+class spell_item_nahemarr_proc_activated : public SpellScriptLoader
+{
+public:
+    spell_item_nahemarr_proc_activated() : SpellScriptLoader("spell_item_nahemarr_proc_activated") {}
+
+    class spell_item_nahemarr_proc_activated_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_nahemarr_proc_activated_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            Unit* target = procInfo.GetProcTarget();
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), GetSpellInfo()->Effects[0].CalcValue());
+            if (target->HasAura(81387))
+                caster->CastCustomSpell(target, 81388, &damage, NULL, NULL, true);
+            else
+                caster->CastCustomSpell(caster, 81389, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_nahemarr_proc_activated_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_nahemarr_proc_activated_AuraScript();
+    }
+};
+
 void AddSC_item_spell_scripts()
 {
     // 23074 Arcanite Dragonling
@@ -2697,4 +3042,15 @@ void AddSC_item_spell_scripts()
     new spell_item_chicken_cover();
     new spell_item_muisek_vessel();
     new spell_item_greatmothers_soulcatcher();
+
+    new spell_item_hellfire_ring_damage_proc();
+    new spell_item_hellfire_ring_heal_proc();
+    new spell_item_levelup_to();
+    new spell_item_edge_of_madness();
+    new spell_item_blade_bulwark();
+    new spell_item_edge_of_madness_heal();
+    new spell_item_give_xp();
+    new spell_item_hexentanz_energy_convert();
+    new spell_item_nahemarr_proc();
+    new spell_item_nahemarr_proc_activated();
 }

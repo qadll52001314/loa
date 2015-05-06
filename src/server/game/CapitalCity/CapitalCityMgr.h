@@ -40,14 +40,6 @@ struct CapitalCityNpcResearchState
     uint32 itemCount4;
 };
 
-struct CapitalCityUpgradeCost
-{
-    uint32 startResource;
-    uint32 startMagicPower;
-    uint32 resource;
-    uint32 magicPower;
-};
-
 struct CapitalCityResearchData
 {
     uint32 researchSet;
@@ -75,7 +67,7 @@ struct CapitalCityResearchState
 };
 
 typedef std::map<uint32, CapitalCity*> CapitalCityMap;
-typedef std::map<uint32, CapitalCityUpgradeCost> CapitalCityUpgradeCostMap;
+typedef std::map<uint32, uint32> CapitalCityUpgradeCostMap;
 typedef std::multimap<uint32, CapitalCityResearchData> CapitalCityResearchDataMap;
 typedef std::map<uint32, const CapitalCityResearchData*> PCapitalCityResearchDataMap;
 typedef std::multimap<uint32, CapitalCityNpcResearchState> CapitalCityResearchStateMap;
@@ -139,9 +131,6 @@ public:
     CapitalCity* FactionBelongsTo(uint32 faction) const;
 
     uint32 ResourceToNextLevel(uint32 nextLevel) const;
-    uint32 MagicPowerToNextLevel(uint32 nextLevel) const;
-    uint32 StartResourceToNextLevel(uint32 nextLevel) const;
-    uint32 StartMagicPowerToNextLevel(uint32 nextLevel) const;
 
     CapitalCityResearchDataSetContainer GetAvailableResearchSet(const Creature* researcher) const;
     CapitalCityResearchDataSetContainer GetInProgressResearchSet(const Creature* researcher) const;

@@ -28,6 +28,8 @@
 #include "ConditionMgr.h"
 #include "Player.h"
 #include "WorldSession.h"
+#include "LegacyMgr.h"
+#include "Chat.h"
 
 void AddItemsSetItem(Player* player, Item* item)
 {
@@ -255,6 +257,10 @@ Item::Item()
     m_refundRecipient = 0;
     m_paidMoney = 0;
     m_paidExtendedCost = 0;
+
+    m_Exp = 0;
+    m_BroadcastExp = 0;
+    m_BroadcastExpTimer = 0;
 }
 
 bool Item::Create(uint32 guidlow, uint32 itemid, Player const* owner)
@@ -354,6 +360,7 @@ void Item::SaveToDB(SQLTransaction& trans)
             stmt->setUInt16(++index, GetUInt32Value(ITEM_FIELD_DURABILITY));
             stmt->setUInt32(++index, GetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME));
             stmt->setString(++index, m_text);
+            stmt->setUInt32(++index, m_Exp);
             stmt->setUInt32(++index, guid);
 
             trans->Append(stmt);
@@ -402,8 +409,8 @@ void Item::SaveToDB(SQLTransaction& trans)
 
 bool Item::LoadFromDB(uint32 guid, ObjectGuid owner_guid, Field* fields, uint32 entry)
 {
-    //                                                    0                1      2         3        4      5             6                 7           8           9    10
-    //result = CharacterDatabase.PQuery("SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, playedTime, text FROM item_instance WHERE guid = '%u'", guid);
+    //                                                    0                1      2         3        4      5             6                 7           8           9    10  11
+    //result = CharacterDatabase.PQuery("SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, playedTime, text, exp FROM item_instance WHERE guid = '%u'", guid);
 
     // create item before any checks for store correct guid
     // and allow use "FSetState(ITEM_REMOVED); SaveToDB();" for deleting item from DB
@@ -467,6 +474,7 @@ bool Item::LoadFromDB(uint32 guid, ObjectGuid owner_guid, Field* fields, uint32 
 
     SetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME, fields[9].GetUInt32());
     SetText(fields[10].GetString());
+    m_Exp = fields[11].GetUInt32();
 
     if (need_save)                                           // normal item changed state set not work at loading
     {
@@ -602,12 +610,21 @@ int32 Item::GenerateItemRandomPropertyId(uint32 item_id)
 {
     ItemTemplate const* itemProto = sObjectMgr->GetItemTemplate(item_id);
 
-    if (!itemProto)
+    if (!itemProto || !(itemProto->Class == ITEM_CLASS_WEAPON || itemProto->Class == ITEM_CLASS_ARMOR))
         return 0;
+
+    if (itemProto->Flags & ITEM_PROTO_FLAG_LEGACY)
+        return xLegacyMgr->RollLegacyEnchant(itemProto);
 
     // item must have one from this field values not null if it can have random enchantments
     if ((!itemProto->RandomProperty) && (!itemProto->RandomSuffix))
+    {
+        if (!urand(0, 4))
+            return xLegacyMgr->RollLegacyEnchantOfRank(urand(1, 8));
+        else if (!urand(0, 9))
+            return xLegacyMgr->RollLegacyEnchantOfRank(urand(9, 15));
         return 0;
+    }
 
     // item can have not null only one from field values
     if ((itemProto->RandomProperty) && (itemProto->RandomSuffix))
@@ -644,40 +661,87 @@ int32 Item::GenerateItemRandomPropertyId(uint32 item_id)
     }
 }
 
-void Item::SetItemRandomProperties(int32 randomPropId)
+void Item::SetItemRandomProperties(int32 randomPropId, bool equiped /*= false*/)
 {
     if (!randomPropId)
         return;
 
-    if (randomPropId > 0)
+    if (equiped)
     {
-        ItemRandomPropertiesEntry const* item_rand = sItemRandomPropertiesStore.LookupEntry(randomPropId);
-        if (item_rand)
+        Player* player = GetOwner();
+        if (randomPropId > 0)
         {
-            if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != int32(item_rand->ID))
+            ItemRandomPropertiesEntry const* item_rand = sItemRandomPropertiesStore.LookupEntry(randomPropId);
+            if (item_rand)
             {
-                SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, item_rand->ID);
-                SetState(ITEM_CHANGED, GetOwner());
+                if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != int32(item_rand->ID))
+                {
+                    SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, item_rand->ID);
+                    SetState(ITEM_CHANGED, GetOwner());
+                }
+                for (uint32 i = PROP_ENCHANTMENT_SLOT_2; i < PROP_ENCHANTMENT_SLOT_2 + 3; ++i)
+                {
+                    player->ApplyEnchantment(this, EnchantmentSlot(i), false);
+                    SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_2], 0, 0);
+                    player->ApplyEnchantment(this, EnchantmentSlot(i), true);
+                }
+
             }
-            for (uint32 i = PROP_ENCHANTMENT_SLOT_2; i < PROP_ENCHANTMENT_SLOT_2 + 3; ++i)
-                SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_2], 0, 0);
+        }
+        else
+        {
+            ItemRandomSuffixEntry const* item_rand = sItemRandomSuffixStore.LookupEntry(-randomPropId);
+            if (item_rand)
+            {
+                if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != -int32(item_rand->ID) ||
+                    !GetItemSuffixFactor())
+                {
+                    SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, -int32(item_rand->ID));
+                    UpdateItemSuffixFactor();
+                    SetState(ITEM_CHANGED, GetOwner());
+                }
+
+                for (uint32 i = PROP_ENCHANTMENT_SLOT_0; i < PROP_ENCHANTMENT_SLOT_0 + 3; ++i)
+                {
+                    player->ApplyEnchantment(this, EnchantmentSlot(i), false);
+                    SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_0], 0, 0);
+                    player->ApplyEnchantment(this, EnchantmentSlot(i), true);
+                }
+            }
         }
     }
     else
     {
-        ItemRandomSuffixEntry const* item_rand = sItemRandomSuffixStore.LookupEntry(-randomPropId);
-        if (item_rand)
+        if (randomPropId > 0)
         {
-            if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != -int32(item_rand->ID) ||
-                !GetItemSuffixFactor())
+            ItemRandomPropertiesEntry const* item_rand = sItemRandomPropertiesStore.LookupEntry(randomPropId);
+            if (item_rand)
             {
-                SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, -int32(item_rand->ID));
-                UpdateItemSuffixFactor();
-                SetState(ITEM_CHANGED, GetOwner());
+                if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != int32(item_rand->ID))
+                {
+                    SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, item_rand->ID);
+                    SetState(ITEM_CHANGED, GetOwner());
+                }
+                for (uint32 i = PROP_ENCHANTMENT_SLOT_2; i < PROP_ENCHANTMENT_SLOT_2 + 3; ++i)
+                    SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_2], 0, 0);
             }
+        }
+        else
+        {
+            ItemRandomSuffixEntry const* item_rand = sItemRandomSuffixStore.LookupEntry(-randomPropId);
+            if (item_rand)
+            {
+                if (GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID) != -int32(item_rand->ID) ||
+                    !GetItemSuffixFactor())
+                {
+                    SetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID, -int32(item_rand->ID));
+                    UpdateItemSuffixFactor();
+                    SetState(ITEM_CHANGED, GetOwner());
+                }
 
-            for (uint32 i = PROP_ENCHANTMENT_SLOT_0; i < PROP_ENCHANTMENT_SLOT_0 + 3; ++i)
-                SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_0], 0, 0);
+                for (uint32 i = PROP_ENCHANTMENT_SLOT_0; i < PROP_ENCHANTMENT_SLOT_0 + 3; ++i)
+                    SetEnchantment(EnchantmentSlot(i), item_rand->enchant_id[i - PROP_ENCHANTMENT_SLOT_0], 0, 0);
+            }
         }
     }
 }
@@ -937,6 +1001,36 @@ void Item::ClearEnchantment(EnchantmentSlot slot)
     for (uint8 x = 0; x < MAX_ITEM_ENCHANTMENT_EFFECTS; ++x)
         SetUInt32Value(ITEM_FIELD_ENCHANTMENT_1_1 + slot*MAX_ENCHANTMENT_OFFSET + x, 0);
     SetState(ITEM_CHANGED, GetOwner());
+}
+
+uint32 Item::GetGemColor(EnchantmentSlot slot) const
+{
+    if (slot < SOCK_ENCHANTMENT_SLOT || slot > SOCK_ENCHANTMENT_SLOT_3)
+        return 0;
+
+    uint32 enchant_id = GetEnchantmentId(slot);
+    if (!enchant_id) // no gems on this socket
+        return 0;
+
+    SpellItemEnchantmentEntry const* enchantEntry = sSpellItemEnchantmentStore.LookupEntry(enchant_id);
+    if (!enchantEntry) // invalid gem id on this socket
+        return 0;
+
+    uint8 GemColor = 0;
+
+    uint32 gemid = enchantEntry->GemID;
+    if (gemid)
+    {
+        ItemTemplate const* gemProto = sObjectMgr->GetItemTemplate(gemid);
+        if (gemProto)
+        {
+            GemPropertiesEntry const* gemProperty = sGemPropertiesStore.LookupEntry(gemProto->GemProperties);
+            if (gemProperty)
+                return gemProperty->color;
+        }
+    }
+
+    return 0;
 }
 
 bool Item::GemsFitSockets() const
@@ -1424,4 +1518,61 @@ void Item::ItemContainerDeleteLootMoneyAndLootItemsFromDB()
     // Deletes money and items associated with an openable item from the DB
     ItemContainerDeleteLootMoneyFromDB();
     ItemContainerDeleteLootItemsFromDB();
+}
+
+void Item::GainExp(uint32 exp)
+{
+    Player* player = GetOwner();
+    if (!player)
+        return;
+
+    if (exp)
+    {
+        const ItemUpgrade* upgrade = xLegacyMgr->GetItemUpgrade(GetEntry());
+        if (upgrade)
+        {
+            m_Exp += exp;
+            m_BroadcastExp += exp;
+            m_BroadcastExpTimer = 0;
+            if (upgrade->next && m_Exp >= upgrade->xp)
+            {
+                m_Exp -= upgrade->xp;
+                SetEntry(upgrade->next);
+                SetState(ITEM_CHANGED, player);
+                ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(62, GetTemplate()->Name1.c_str()).c_str());
+            }
+        }
+        // @todo: savetodb.
+    }
+}
+
+uint32 Item::RollLegacy(uint32 item, float chance)
+{
+    const ItemTemplate* proto = sObjectMgr->GetItemTemplate(item);
+    if (proto->Flags & ITEM_PROTO_FLAG_LEGACY) // cant roll legacy of legacy
+        return item;
+
+    if (uint32 legacy = xLegacyMgr->GetLegacyOf(item))
+    {
+        if (frand(0, 100.0f) < chance)
+            return legacy;
+    }
+
+    return item;
+}
+
+void Item::Update(uint32 diff)
+{
+    if (m_BroadcastExpTimer <= BROADCAST_EXP_TIMER)
+        m_BroadcastExpTimer += diff;
+    else if (m_BroadcastExp)
+    {
+        if (Player* player = GetOwner())
+        {
+            const ItemUpgrade* upgrade = xLegacyMgr->GetItemUpgrade(GetEntry());
+            ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(67, GetTemplate()->Name1.c_str(), m_BroadcastExp, m_Exp, upgrade->xp).c_str());
+            m_BroadcastExpTimer = 0;
+            m_BroadcastExp = 0;
+        }
+    }
 }

@@ -39,6 +39,7 @@ struct TrainerSpell;
 struct VendorItem;
 struct CapitalCityNpcResearchState;
 struct CapitalCityResearchData;
+struct CollectableMemory;
 
 class AchievementMgr;
 class ReputationMgr;
@@ -1109,7 +1110,8 @@ private:
     bool _isPvP;
 };
 
-typedef std::set<int32> CollectedMemorySet;
+typedef std::map<uint32, bool> CollectedMemoryMap;
+typedef std::map<uint32, uint32> AccountLootCooldownMap;
 
 class Player : public Unit, public GridObject<Player>
 {
@@ -1119,10 +1121,6 @@ class Player : public Unit, public GridObject<Player>
     public:
         explicit Player(WorldSession* session);
         ~Player();
-
-        bool CanSeeOrDetectEx(WorldObject const* obj, bool ignoreStealth = false, bool distanceCheck = false) const;
-        bool MemoryCollected(int32 entry) const;
-        void SaveCollectedMemory(int32 memory);
 
         void CleanupsBeforeDelete(bool finalCleanup = true) override;
 
@@ -1826,6 +1824,8 @@ class Player : public Unit, public GridObject<Player>
         void UpdateAttackPowerAndDamage(bool ranged = false) override;
         void UpdateShieldBlockValue();
         void ApplySpellPowerBonus(int32 amount, bool apply);
+        void ApplySpellDamageBonus(int32 amount, bool apply);
+        void ApplySpellHealingBonus(int32 amount, bool apply);
         void UpdateSpellDamageAndHealingBonus();
         void ApplyRatingMod(CombatRating cr, int32 value, bool apply);
         void UpdateRating(CombatRating cr);
@@ -2380,7 +2380,6 @@ class Player : public Unit, public GridObject<Player>
         /*********************************************************/
         /***                    WAR SCHOOL                     ***/
         /*********************************************************/
-
     public:
         void JoinWarSchool(uint32 warSchool);
         void LeaveWarSchool();
@@ -2392,7 +2391,6 @@ class Player : public Unit, public GridObject<Player>
         /*********************************************************/
         /***                  SUPREMACY LEVEL                  ***/
         /*********************************************************/
-
     public:
         void GiveSupremacyLevel();
         float GetPrimaryStat() const;
@@ -2414,8 +2412,17 @@ class Player : public Unit, public GridObject<Player>
         uint32 GetCapitalCityLevel();
         SpellFamilyNames GetSpellFamilyName() const;
         void TryCompound();
+        void TryRecycle();
         Item* GetCompoundContainer() const;
         uint32 GetAccountMemoryCount(uint32 memory) const;
+        void UpdateLegacyItems(uint32 diff);
+        void LoadLootCooldown();
+        bool HasLootCooldown(uint32 item) const;
+        void AddLootCooldown(uint32 item);
+        void RemoveLootCooldown(uint32 item);
+        void UpdateLootCooldown(uint32 diff);
+    private:
+        AccountLootCooldownMap m_AccountLootCooldownMap;
 
         /*********************************************************/
         /***                  CAPITAL CITY                     ***/
@@ -2428,6 +2435,18 @@ class Player : public Unit, public GridObject<Player>
         void SendResearchProgressState(const CapitalCityNpcResearchState* state);
         void SendFirstRankResearchState(const CapitalCityResearchData* data);
         void StartResearch(Creature* researcher, uint8 index);
+
+        /*********************************************************/
+        /***                 MEMORY RELATED                    ***/
+        /*********************************************************/
+    public:
+        bool CanSeeOrDetectEx(WorldObject const* obj, bool ignoreStealth = false, bool distanceCheck = false) const;
+        bool MemoryCollected(uint32 memory) const;
+        void CollectMemory(uint32 memory, bool collected = true);
+        void CollectMemoryAtLogin();
+        void CollectMemory(const CollectableMemory* memory, bool announce = true);
+    private:
+        CollectedMemoryMap m_CollectedMemoryMap;
 
     protected:
         // Gamemaster whisper whitelist
@@ -2764,8 +2783,6 @@ class Player : public Unit, public GridObject<Player>
         uint32 _pendingBindTimer;
 
         uint32 _activeCheats;
-
-        CollectedMemorySet m_CollectedMemorySet;
 };
 
 void AddItemsSetItem(Player* player, Item* item);

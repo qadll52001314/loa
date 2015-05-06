@@ -10,7 +10,7 @@ void CapitalCityMgr::LoadCapitalCities()
     uint32 oldMSTime = getMSTime();
 
 
-    QueryResult result = WorldDatabase.Query("SELECT ID, Zone, Faction, StartLevel, ScriptName FROM capital_cities");
+    QueryResult result = WorldDatabase.Query("SELECT ID, Zone, Faction, StartLevel, ScriptName FROM capital_city");
 
     if (!result)
     {
@@ -36,7 +36,7 @@ void CapitalCityMgr::LoadCapitalCities()
         }
     } while (result->NextRow());
 
-    result = CharacterDatabase.Query("SELECT ID, Resource, MagicPower, Level, UpgradeResource, UpgradeMagicPower, Upgrading FROM capital_city_state");
+    result = CharacterDatabase.Query("SELECT ID, Resource, Level, Upgrading FROM capital_city_state");
 
     if (result)
     {
@@ -46,11 +46,8 @@ void CapitalCityMgr::LoadCapitalCities()
             if (CapitalCity* city = GetCapitalCityByID(fields[0].GetUInt32()))
             {
                 city->SetResource(fields[1].GetUInt32());
-				city->SetMagicPower(fields[2].GetUInt32());
-                city->SetRank(fields[3].GetUInt32() > city->GetRank() ? fields[3].GetUInt32() : city->GetRank());
-                city->SetUpgradeResource(fields[4].GetUInt32());
-                city->SetUpgradeMagicPower(fields[5].GetUInt32());
-                city->SetUpgradeState(fields[6].GetBool());
+                city->SetRank(fields[2].GetUInt32() > city->GetRank() ? fields[2].GetUInt32() : city->GetRank());
+                city->SetUpgradeState(fields[3].GetBool());
             }
         } while (result->NextRow());
     }
@@ -59,7 +56,7 @@ void CapitalCityMgr::LoadCapitalCities()
 
     m_UpgradeCosts.clear();
 
-    result = WorldDatabase.Query("SELECT Level, StartResource, StartMagicPower, Resource, MagicPower FROM capital_city_upgrade_cost");
+    result = WorldDatabase.Query("SELECT Level, Resource FROM capital_city_upgrade_cost");
 
     count = 0;
 
@@ -68,12 +65,7 @@ void CapitalCityMgr::LoadCapitalCities()
         do 
         {
             Field* fields = result->Fetch();
-            CapitalCityUpgradeCost info;
-            info.startResource = fields[1].GetUInt32();
-            info.startMagicPower = fields[2].GetUInt32();
-            info.resource = fields[3].GetUInt32();
-            info.magicPower = fields[4].GetUInt32();
-            m_UpgradeCosts[fields[0].GetUInt32()] = info;
+            m_UpgradeCosts[fields[0].GetUInt32()] = fields[1].GetUInt32();
             ++count;
         } while (result->NextRow());
     }
@@ -356,31 +348,7 @@ uint32 CapitalCityMgr::ResourceToNextLevel(uint32 nextLevel) const
     CapitalCityUpgradeCostMap::const_iterator itr = m_UpgradeCosts.find(nextLevel);
     if (itr == m_UpgradeCosts.end())
         return 0;
-    return itr->second.resource;
-}
-
-uint32 CapitalCityMgr::MagicPowerToNextLevel(uint32 nextLevel) const
-{
-    CapitalCityUpgradeCostMap::const_iterator itr = m_UpgradeCosts.find(nextLevel);
-    if (itr == m_UpgradeCosts.end())
-        return 0;
-    return itr->second.magicPower;
-}
-
-uint32 CapitalCityMgr::StartResourceToNextLevel(uint32 nextLevel) const
-{
-    CapitalCityUpgradeCostMap::const_iterator itr = m_UpgradeCosts.find(nextLevel);
-    if (itr == m_UpgradeCosts.end())
-        return 0;
-    return itr->second.startResource;
-}
-
-uint32 CapitalCityMgr::StartMagicPowerToNextLevel(uint32 nextLevel) const
-{
-    CapitalCityUpgradeCostMap::const_iterator itr = m_UpgradeCosts.find(nextLevel);
-    if (itr == m_UpgradeCosts.end())
-        return 0;
-    return itr->second.startMagicPower;
+    return itr->second;
 }
 
 CapitalCityResearchDataSetContainer CapitalCityMgr::GetAvailableResearchSet(const Creature* researcher) const

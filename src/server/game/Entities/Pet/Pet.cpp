@@ -1360,7 +1360,7 @@ void Pet::_SaveAuras(SQLTransaction& trans)
 
         uint8 index = 0;
 
-        stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PET_AURA);
+        stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_PET_AURA);
         stmt->setUInt32(index++, m_charmInfo->GetPetNumber());
         stmt->setUInt64(index++, casterGUID.GetRawValue());
         stmt->setUInt32(index++, itr->second->GetId());

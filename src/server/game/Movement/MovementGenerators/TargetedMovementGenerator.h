@@ -61,6 +61,7 @@ class TargetedMovementGeneratorMedium : public MovementGeneratorMedium< T, D >, 
         float i_angle;
         bool i_recalculateTravel : 1;
         bool i_targetReached : 1;
+        Position i_targetPosition;
 };
 
 template<class T>
@@ -84,7 +85,7 @@ class ChaseMovementGenerator : public TargetedMovementGeneratorMedium<T, ChaseMo
         static void _addUnitStateMove(T* u)  { u->AddUnitState(UNIT_STATE_CHASE_MOVE); }
         bool EnableWalking() const { return false;}
         bool _lostTarget(T* u) const { return u->GetVictim() != this->GetTarget(); }
-        void _reachTarget(T*);
+        void _reachTarget(T*, bool destMatch = true);
 };
 
 template<class T>
@@ -108,7 +109,7 @@ class FollowMovementGenerator : public TargetedMovementGeneratorMedium<T, Follow
         static void _addUnitStateMove(T* u)  { u->AddUnitState(UNIT_STATE_FOLLOW_MOVE); }
         bool EnableWalking() const;
         bool _lostTarget(T*) const { return false; }
-        void _reachTarget(T*) { }
+        void _reachTarget(T*, bool) { }
     private:
         void _updateSpeed(T* owner);
 };

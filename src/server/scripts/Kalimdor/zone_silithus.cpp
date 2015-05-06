@@ -1321,6 +1321,10 @@ class go_wind_stone : public GameObjectScript
             uint8 rank = GetPlayerRank(player);
 
             uint32 gossipId = go->GetGOInfo()->GetGossipMenuId();
+            player->SEND_GOSSIP_MENU(player->GetGossipTextId(gossipId, go), go->GetGUID());
+            return true;
+
+            // @todo: fix item destory on gossip
             switch (gossipId)
             {
                 case GOSSIPID_LESSER_WS:

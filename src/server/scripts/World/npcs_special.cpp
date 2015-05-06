@@ -2671,6 +2671,7 @@ public:
             me->AddAura(81873, me);
             me->AddAura(81874, me);
             me->AddAura(81395, me);
+            me->HandleEmoteCommand(EMOTE_STATE_KNEEL);
             me->SetStandState(UNIT_STAND_STATE_KNEEL);
         }
 
@@ -2684,14 +2685,14 @@ public:
 
     bool OnGossipHello(Player* player, Creature* creature) override
     {
-        int32 entry = creature->GetEntry();
-        if (const MemoryCollector* memory = sObjectMgr->GetMemoryCollector(entry))
+        uint32 m = creature->GetCreatureTemplate()->Memory;
+        if (const CollectableMemory* memory = xMemoryMgr->GetCollectableMemory(m))
         {
             player->PlayerTalkClass->ClearMenus();
-            if (!player->MemoryCollected(entry) || (memory->item && player->HasItemCount(memory->item, 1, true)) || (memory->spell && player->HasSpell(memory->spell)))
+            if (!player->MemoryCollected(m))
             {
                 std::string itemName = ItemChatLink::FormatName(memory->reqItem);
-                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(55), GOSSIP_SENDER_MAIN, 1001, sObjectMgr->GetServerMessage(54, itemName.c_str(), memory->count), 0, false);
+                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(55), GOSSIP_SENDER_MAIN, 1001, sObjectMgr->GetServerMessage(54, itemName.c_str(), memory->reqItemCount), 0, false);
             }
             player->SEND_GOSSIP_MENU(memory->text, creature->GetGUID());
         }
@@ -2705,53 +2706,22 @@ public:
     {
         if (action == 1001)
         {
-            int32 entry = creature->GetEntry();
-            if (const MemoryCollector* memory = sObjectMgr->GetMemoryCollector(entry))
+            uint32 m = creature->GetCreatureTemplate()->Memory;
+            if (const CollectableMemory* memory = xMemoryMgr->GetCollectableMemory(m))
             {
-                if (!player->HasItemCount(memory->reqItem, memory->count))
+                if (!player->HasItemCount(memory->reqItem, memory->reqItemCount))
                 {
                     player->CLOSE_GOSSIP_MENU();
-                    std::string name = ItemChatLink::FormatName(57427);
+                    std::string name = ItemChatLink::FormatName(memory->reqItem);
                     ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(53, name.c_str()).c_str());
                 }
                 else
                 {
-                    uint32 count = memory->count;
+                    uint32 count = memory->reqItemCount;
                     player->DestroyItemCount(memory->reqItem, count, true);
-                    if (memory->item)
-                    {
-                        ItemPosCountVec sDest;
-                        // store in main bag to simplify second pass (special bags can be not equipped yet at this moment)
-                        InventoryResult msg = player->CanStoreNewItem(INVENTORY_SLOT_BAG_0, NULL_SLOT, sDest, memory->item, 1);
-                        if (msg == EQUIP_ERR_OK)
-                            player->StoreNewItem(sDest, memory->item, true);
-                        else
-                        {
-                            SQLTransaction trans = CharacterDatabase.BeginTransaction();
-                            MailDraft draft = MailDraft(297);
-                            Item* item = Item::CreateItem(memory->item, 1, player);
-                            if (item)
-                            {
-                                item->SaveToDB(trans);
-                                draft.AddItem(item);
-                            }
-                            draft.SendMailTo(trans, player, MailSender(MAIL_CREATURE, 43304));
-                            CharacterDatabase.CommitTransaction(trans);
-                        }
-
-                        std::string name = ItemChatLink::FormatName(memory->item);
-                        ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
-                    }
-
-                    if (memory->spell)
-                    {
-                        player->LearnSpell(memory->spell, false);
-                        std::string name = SpellChatLink::FormatName(memory->spell);
-                        ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
-                    }
+                    player->CollectMemory(memory, true);
 
                     player->CLOSE_GOSSIP_MENU();
-                    player->SaveCollectedMemory(creature->GetEntry());
                     player->SaveToDB(); // in case crash during saving cycle.
                 }
             }

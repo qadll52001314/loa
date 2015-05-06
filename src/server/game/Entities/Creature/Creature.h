@@ -140,6 +140,7 @@ struct CreatureTemplate
     uint32  ScriptID;
     uint32  WarSchool;
     uint32  ResearchSet[MAX_CREATURE_RESEARCHSET];
+    uint32  Memory;
     uint32  GetRandomValidModelId() const;
     uint32  GetFirstValidModelId() const;
 
@@ -692,6 +693,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         uint32 GetCapitalCityRank();
         TrainerSpellMap GetResearchSpells();
         bool IsResearcher() const;
+        bool EvadeRegen() const { return m_EvadeTimer >= 5000; }
 
     protected:
         bool CreateFromProto(uint32 guidlow, uint32 entry, CreatureData const* data = nullptr, uint32 vehId = 0);
@@ -716,7 +718,7 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
 
         ReactStates m_reactState;                           // for AI, not charmInfo
         void RegenerateMana();
-        void RegenerateHealth();
+        void RegenerateHealth(bool evade = false);
         void Regenerate(Powers power);
         MovementGeneratorType m_defaultMovementType;
         uint32 m_DBTableGuid;                               ///< For new or temporary creatures is 0 for saved it is lowguid
@@ -751,6 +753,9 @@ class Creature : public Unit, public GridObject<Creature>, public MapObject
         //WaypointMovementGenerator vars
         uint32 m_waypointID;
         uint32 m_path_id;
+
+        uint32 m_EvadeTimer;
+        uint32 m_EvadeRegenTimer;
 
         //Formation var
         CreatureGroup* m_formation;

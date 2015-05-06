@@ -202,6 +202,7 @@ enum ItemUpdateState
 };
 
 #define MAX_ITEM_SPELLS 5
+#define BROADCAST_EXP_TIMER 2000
 
 bool ItemCanGoIntoBag(ItemTemplate const* proto, ItemTemplate const* pBagProto);
 
@@ -262,6 +263,7 @@ class Item : public Object
         bool IsFitToSpellRequirements(SpellInfo const* spellInfo) const;
         bool IsLimitedToAnotherMapOrZone(uint32 cur_mapId, uint32 cur_zoneId) const;
         bool GemsFitSockets() const;
+        uint32 GetGemColor(EnchantmentSlot slot) const;
 
         uint32 GetCount() const { return GetUInt32Value(ITEM_FIELD_STACK_COUNT); }
         void SetCount(uint32 value) { SetUInt32Value(ITEM_FIELD_STACK_COUNT, value); }
@@ -279,6 +281,9 @@ class Item : public Object
 
         bool IsInBag() const { return m_container != NULL; }
         bool IsEquipped() const;
+        bool IsLegacy() const { return (GetTemplate()->Flags & ITEM_PROTO_FLAG_LEGACY) != 0; }
+
+        void Update(uint32 diff);
 
         uint32 GetSkill();
         uint32 GetSpell();
@@ -286,7 +291,7 @@ class Item : public Object
         // RandomPropertyId (signed but stored as unsigned)
         int32 GetItemRandomPropertyId() const { return GetInt32Value(ITEM_FIELD_RANDOM_PROPERTIES_ID); }
         uint32 GetItemSuffixFactor() const { return GetUInt32Value(ITEM_FIELD_PROPERTY_SEED); }
-        void SetItemRandomProperties(int32 randomPropId);
+        void SetItemRandomProperties(int32 randomPropId, bool equiped = false);
         void UpdateItemSuffixFactor();
         static int32 GenerateItemRandomPropertyId(uint32 item_id);
         void SetEnchantment(EnchantmentSlot slot, uint32 id, uint32 duration, uint32 charges, ObjectGuid caster = ObjectGuid::Empty);
@@ -353,6 +358,9 @@ class Item : public Object
         void BuildUpdate(UpdateDataMapType&) override;
 
         uint32 GetScriptId() const { return GetTemplate()->ScriptId; }
+
+        void GainExp(uint32 exp);
+        static uint32 RollLegacy(uint32 item, float chance);
     private:
         std::string m_text;
         uint8 m_slot;
@@ -365,5 +373,8 @@ class Item : public Object
         uint32 m_paidMoney;
         uint32 m_paidExtendedCost;
         AllowedLooterSet allowedGUIDs;
+        uint32 m_Exp;
+        uint32 m_BroadcastExp;
+        uint32 m_BroadcastExpTimer;
 };
 #endif

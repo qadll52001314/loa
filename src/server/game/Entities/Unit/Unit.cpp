@@ -5665,21 +5665,6 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
                         CastCustomSpell(target, 81334, &basepoints0, NULL, NULL, true);
                     return true;
                 }
-                case 81385:
-                {
-                    if (!HasAura(81386))
-                        CastSpell(target, 81387, true);
-                    return true;
-                }
-                case 81386:
-                {
-                    basepoints0 = CalculatePct(damage, triggeredByAura->GetAmount());
-                    if (target->HasAura(81387))
-                        CastCustomSpell(target, 81388, &basepoints0, NULL, NULL, true);
-                    else
-                        CastCustomSpell(this, 81389, &basepoints0, NULL, NULL, true);
-                    return true;
-                }
                 case 81574:
                 case 81587:
                 case 81595:
@@ -10799,6 +10784,13 @@ float Unit::GetUnitSpellCriticalChance(Unit* victim, SpellInfo const* spellProto
                             break;
                         }
                         break;
+                    case SPELLFAMILY_ROGUE:
+                        if (HasAura(81915) && victim)
+                        {
+                            if (victim->HasAuraWithMechanic(1 << MECHANIC_BLEED))
+                                crit_chance += 10.0f;
+                        }
+                        break;
                 }
             }
         /// Intentional fallback. Calculate critical strike chance for both Ranged and Melee spells
@@ -10844,6 +10836,19 @@ uint32 Unit::SpellCriticalDamageBonus(SpellInfo const* spellProto, uint32 damage
 
     if (victim)
         crit_mod += GetTotalAuraModifierByMiscMask(SPELL_AURA_MOD_CRIT_PERCENT_VERSUS, victim->GetCreatureTypeMask());
+
+    switch (spellProto->SpellFamilyName)
+    {
+        case SPELLFAMILY_ROGUE:
+            if (HasAura(81916) && victim)
+            {
+                if (victim->HasAuraWithMechanic(1 << MECHANIC_BLEED))
+                    crit_mod += 30.0f;
+            }
+            break;
+        default:
+            break;
+    }
 
     if (crit_bonus != 0)
         AddPct(crit_bonus, crit_mod);
@@ -12994,8 +12999,13 @@ Unit* Creature::SelectVictim()
     //  don't evade if damage received within the last 10 seconds
     // Does not apply to world bosses to prevent kiting to cities
     if (!isWorldBoss() && !GetInstanceId())
+    {
         if (time(NULL) - GetLastDamagedTime() <= MAX_AGGRO_RESET_TIME)
-            return target;
+        {
+            if (target)
+                return target;
+        }
+    }
 
     // last case when creature must not go to evade mode:
     // it in combat but attacker not make any damage and not enter to aggro radius to have record in threat list
@@ -15623,8 +15633,8 @@ void Unit::Kill(Unit* victim, bool durabilityLoss)
         if (creature && creature->CanLoot())
         {
             Loot* loot = &creature->loot;
-
             loot->clear();
+            loot->GenerateCustomCreatureLoot(player, creature);
             if (uint32 lootid = creature->GetCreatureTemplate()->lootid)
                 loot->FillLoot(lootid, LootTemplates_Creature, looter, false, false, creature->GetLootMode());
 

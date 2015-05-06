@@ -67,8 +67,9 @@
 #include "CapitalCityMgr.h"
 #include "ResourcePointMgr.h"
 #include "WarSchool.h"
-#include "Compounding.h"
+#include "CompoundMgr.h"
 #include "MemoryMgr.h"
+#include "LegacyMgr.h"
 
 std::atomic<bool> World::m_stopEvent(false);
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -1378,14 +1379,14 @@ void World::SetInitialWorldSettings()
     if (!sObjectMgr->LoadTrinityStrings())
         exit(1);                                            // Error message displayed in function already
 
+    TC_LOG_INFO("server.loading", "Loading Legacy Data...");
+    xLegacyMgr->Load();
+
     TC_LOG_INFO("server.loading", "Loading Server Messages...");
     sObjectMgr->LoadServerMesssages();
 
     TC_LOG_INFO("server.loading", "Loading Specialization Skill Map...");
     sObjectMgr->LoadSpecSkillDataMap();
-
-    TC_LOG_INFO("server.loading", "Loading Memory Collection Map...");
-    sObjectMgr->LoadMemoryCollector();
 
     TC_LOG_INFO("server.loading", "Loading Compounding List...");
     xCompoundingMgr->Load();

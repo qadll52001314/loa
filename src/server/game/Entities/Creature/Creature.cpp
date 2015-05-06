@@ -143,7 +143,7 @@ m_lootRecipient(), m_lootRecipientGroup(0), _skinner(), _pickpocketLootRestore(0
 m_respawnDelay(300), m_corpseDelay(60), m_respawnradius(0.0f), m_reactState(REACT_AGGRESSIVE),
 m_defaultMovementType(IDLE_MOTION_TYPE), m_DBTableGuid(0), m_equipmentId(0), m_originalEquipmentId(0), m_AlreadyCallAssistance(false),
 m_AlreadySearchedAssistance(false), m_regenHealth(true), m_AI_locked(false), m_meleeDamageSchoolMask(SPELL_SCHOOL_MASK_NORMAL),
-m_originalEntry(0), m_homePosition(), m_transportHomePosition(), m_creatureInfo(NULL), m_creatureData(NULL), m_waypointID(0), m_path_id(0), m_formation(NULL)
+m_originalEntry(0), m_homePosition(), m_transportHomePosition(), m_creatureInfo(NULL), m_creatureData(NULL), m_waypointID(0), m_path_id(0), m_formation(NULL), m_EvadeTimer(0), m_EvadeRegenTimer(0)
 {
     m_regenTimer = CREATURE_REGEN_INTERVAL;
     m_valuesCount = UNIT_END;
@@ -541,6 +541,26 @@ void Creature::Update(uint32 diff)
                 m_AI_locked = false;
             }
 
+            if (IsInEvadeMode() && IsAIEnabled)
+            {
+                if (m_EvadeTimer > 10000)
+                {
+                    m_EvadeTimer = 0;
+                    // clear state and evade
+                    ClearUnitState(UNIT_STATE_EVADE);
+                    AI()->EnterEvadeMode();
+                }
+                else
+                    m_EvadeTimer += diff;
+
+                m_EvadeRegenTimer += diff;
+            }
+            else
+            {
+                m_EvadeTimer = 0;
+                m_EvadeRegenTimer = 0;
+            }
+
             // creature can be dead after UpdateAI call
             // CORPSE/DEAD state will processed at next tick (in other case death timer will be updated unexpectedly)
             if (!IsAlive())
@@ -563,7 +583,11 @@ void Creature::Update(uint32 diff)
 
             /*if (m_regenTimer <= diff)
             {*/
-            if (!IsInEvadeMode() && (!bInCombat || IsPolymorphed())) // regenerate health if not in combat or if polymorphed
+            if (bInCombat && IsInEvadeMode())
+            {
+
+            }
+            else if (!IsInEvadeMode() && (!bInCombat || IsPolymorphed())) // regenerate health if not in combat or if polymorphed
                 RegenerateHealth();
 
             if (HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_REGENERATE_POWER))
@@ -625,10 +649,8 @@ void Creature::RegenerateMana()
     ModifyPower(POWER_MANA, addvalue);
 }
 
-void Creature::RegenerateHealth()
+void Creature::RegenerateHealth(bool evade /*= false*/)
 {
-    if (!isRegeneratingHealth())
-        return;
 
     uint32 curValue = GetHealth();
     uint32 maxValue = GetMaxHealth();
@@ -636,30 +658,40 @@ void Creature::RegenerateHealth()
     if (curValue >= maxValue)
         return;
 
-    uint32 addvalue = 0;
-
-    // Not only pet, but any controlled creature
-    if (GetCharmerOrOwnerGUID())
+    if (evade)
     {
-        float HealthIncreaseRate = sWorld->getRate(RATE_HEALTH);
-        float Spirit = GetStat(STAT_SPIRIT);
-
-        if (GetPower(POWER_MANA) > 0)
-            addvalue = uint32(Spirit * 0.25 * HealthIncreaseRate);
-        else
-            addvalue = uint32(Spirit * 0.80 * HealthIncreaseRate);
+        if (EvadeRegen())
+            ModifyHealth(maxValue /= 3);
     }
+    else if (!isRegeneratingHealth())
+        return;
     else
-        addvalue = maxValue/3;
+    {
+        uint32 addvalue = 0;
 
-    // Apply modifiers (if any).
-    AuraEffectList const& ModPowerRegenPCTAuras = GetAuraEffectsByType(SPELL_AURA_MOD_HEALTH_REGEN_PERCENT);
-    for (AuraEffectList::const_iterator i = ModPowerRegenPCTAuras.begin(); i != ModPowerRegenPCTAuras.end(); ++i)
-        AddPct(addvalue, (*i)->GetAmount());
+        // Not only pet, but any controlled creature
+        if (GetCharmerOrOwnerGUID())
+        {
+            float HealthIncreaseRate = sWorld->getRate(RATE_HEALTH);
+            float Spirit = GetStat(STAT_SPIRIT);
 
-    addvalue += GetTotalAuraModifier(SPELL_AURA_MOD_REGEN) * CREATURE_REGEN_INTERVAL  / (5 * IN_MILLISECONDS);
+            if (GetPower(POWER_MANA) > 0)
+                addvalue = uint32(Spirit * 0.25 * HealthIncreaseRate);
+            else
+                addvalue = uint32(Spirit * 0.80 * HealthIncreaseRate);
+        }
+        else
+            addvalue = maxValue / 3;
 
-    ModifyHealth(addvalue);
+        // Apply modifiers (if any).
+        AuraEffectList const& ModPowerRegenPCTAuras = GetAuraEffectsByType(SPELL_AURA_MOD_HEALTH_REGEN_PERCENT);
+        for (AuraEffectList::const_iterator i = ModPowerRegenPCTAuras.begin(); i != ModPowerRegenPCTAuras.end(); ++i)
+            AddPct(addvalue, (*i)->GetAmount());
+
+        addvalue += GetTotalAuraModifier(SPELL_AURA_MOD_REGEN) * CREATURE_REGEN_INTERVAL / (5 * IN_MILLISECONDS);
+
+        ModifyHealth(addvalue);
+    }
 }
 
 void Creature::DoFleeToGetAssistance()
@@ -1465,10 +1497,10 @@ bool Creature::CanStartAttack(Unit const* who, bool force) const
     if (who->GetTypeId() == TYPEID_UNIT && who->GetCreatureType() == CREATURE_TYPE_NON_COMBAT_PET)
         return false;
 
+    //|| who->IsControlledByPlayer() && who->IsFlying()))
+    // we cannot check flying for other creatures, too much map/vmap calculation
+    /// @todo should switch to range attack
     if (!CanFly() && (GetDistanceZ(who) > CREATURE_Z_ATTACK_RANGE + m_CombatDistance))
-        //|| who->IsControlledByPlayer() && who->IsFlying()))
-        // we cannot check flying for other creatures, too much map/vmap calculation
-        /// @todo should switch to range attack
         return false;
 
     if (!force)

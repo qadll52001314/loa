@@ -5620,6 +5620,36 @@ public:
     }
 };
 
+// 81894
+class spell_legacy_recycle : public SpellScriptLoader
+{
+public:
+    spell_legacy_recycle() : SpellScriptLoader("spell_legacy_recycle") {}
+
+    class spell_legacy_recycle_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_legacy_recycle_SpellScript);
+
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                player->TryRecycle();
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_legacy_recycle_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_legacy_recycle_SpellScript();
+    }
+};
+
 void AddSC_generic_spell_scripts()
 {
     new spell_gen_absorb0_hitlimit1();
@@ -5745,4 +5775,5 @@ void AddSC_generic_spell_scripts()
     new spell_legacy_rebirth();
     new spell_legacy_destruct();
     new spell_tier_3_5_proc();
+    new spell_legacy_recycle();
 }

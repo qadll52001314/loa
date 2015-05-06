@@ -576,7 +576,7 @@ class WorldObject : public Object, public WorldLocation
         void MovePositionToFirstCollision(Position &pos, float dist, float angle);
         Position GetFirstCollisionPosition(float dist, float angle);
         Position GetRandomNearPosition(float radius);
-        void GetContactPoint(WorldObject const* obj, float &x, float &y, float &z, float distance2d = CONTACT_DISTANCE) const;
+        void GetContactPoint(WorldObject const* obj, float &x, float &y, float &z, float distance2d = CONTACT_DISTANCE, bool chasePoint = false) const;
 
         float GetObjectSize() const;
         void UpdateGroundPositionZ(float x, float y, float &z) const;

@@ -6145,8 +6145,9 @@ void Spell::EffectPowerHeal(SpellEffIndex effIndex)
 
 void Spell::EffectComprehendSpell(SpellEffIndex effIndex)
 {
-    if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
-        return;
+    return;
+    //if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
+    //    return;
 
     //uint32 entryA = m_spellInfo->Effects[effIndex].MiscValue;
     //uint32 entryB = m_spellInfo->Effects[effIndex].MiscValueB;
@@ -6159,8 +6160,9 @@ void Spell::EffectComprehendSpell(SpellEffIndex effIndex)
 
 void Spell::EffectGrantBaseSpellSet(SpellEffIndex effIndex)
 {
-    if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
-        return;
+    return;
+    //if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
+    //    return;
 
     //if (unitTarget->GetTypeId() != TYPEID_PLAYER)
     //    return;
@@ -6233,6 +6235,8 @@ void Spell::EffectGrantCityResource(SpellEffIndex effIndex)
 
 void Spell::EffectGrantCityMagicPower(SpellEffIndex effIndex)
 {
+    return;
+    /*
     if (effectHandleMode != SPELL_EFFECT_HANDLE_LAUNCH_TARGET)
         return;
 
@@ -6270,6 +6274,7 @@ void Spell::EffectGrantCityMagicPower(SpellEffIndex effIndex)
         draft.SendMailTo(trans, player, MailSender(MAIL_CREATURE, player->GetTeamId() ? WAR_MAIL_SENDER_HORDE : WAR_MAIL_SENDER_ALLIANCE));
         CharacterDatabase.CommitTransaction(trans);
     }
+    */
 }
 
 void Spell::EffectModifySpellCooldown(SpellEffIndex effIndex)

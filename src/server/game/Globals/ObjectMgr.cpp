@@ -410,8 +410,8 @@ void ObjectMgr::LoadCreatureTemplates()
                                              "InhabitType, HoverHeight, HealthModifier, ManaModifier, ArmorModifier, DamageModifier, ExperienceModifier, RacialLeader, "
     //                                        70          71          72          73          74          75          76          77           78                    79           80
                                              "questItem1, questItem2, questItem3, questItem4, questItem5, questItem6, movementId, RegenHealth, mechanic_immune_mask, flags_extra, ScriptName, "
-    //                                        81         82            83            84            85            86            87
-                                             "WarSchool, ResearchSet1, ResearchSet2, ResearchSet3, ResearchSet4, ResearchSet5, ResearchSet6 "
+    //                                        81         82            83            84            85            86            87            88
+                                             "WarSchool, ResearchSet1, ResearchSet2, ResearchSet3, ResearchSet4, ResearchSet5, ResearchSet6, Memory "
                                              "FROM creature_template;");
 
     if (!result)
@@ -521,6 +521,8 @@ void ObjectMgr::LoadCreatureTemplate(Field* fields)
 
     for (uint8 i = 0; i < MAX_CREATURE_RESEARCHSET; ++i)
         creatureTemplate.ResearchSet[i] = fields[82 + i].GetUInt32();
+
+    creatureTemplate.Memory = fields[88].GetUInt32();
 }
 
 void ObjectMgr::LoadCreatureTemplateAddons()
@@ -2597,16 +2599,6 @@ void ObjectMgr::LoadItemTemplates()
             {
                 TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has wrong (non-existing?) stat_type%d (%u)", entry, j+1, itemTemplate.ItemStat[j].ItemStatType);
                 itemTemplate.ItemStat[j].ItemStatType = 0;
-            }
-
-            switch (itemTemplate.ItemStat[j].ItemStatType)
-            {
-                case ITEM_MOD_SPELL_HEALING_DONE:
-                case ITEM_MOD_SPELL_DAMAGE_DONE:
-                    TC_LOG_ERROR("sql.sql", "Item (Entry: %u) has deprecated stat_type%d (%u)", entry, j+1, itemTemplate.ItemStat[j].ItemStatType);
-                    break;
-                default:
-                    break;
             }
         }
 
@@ -6673,7 +6665,7 @@ void ObjectMgr::LoadGameObjectTemplate()
                 {
                     if (got.moTransport.taxiPathId >= sTaxiPathNodesByPath.size() || sTaxiPathNodesByPath[got.moTransport.taxiPathId].empty())
                         TC_LOG_ERROR("sql.sql", "GameObject (Entry: %u GoType: %u) have data0=%u but TaxiPath (Id: %u) not exist.",
-                        entry, got.type, got.moTransport.taxiPathId, got.moTransport.taxiPathId);
+                            entry, got.type, got.moTransport.taxiPathId, got.moTransport.taxiPathId);
                 }
                 if (uint32 transportMap = got.moTransport.mapID)
                     _transportMaps.insert(transportMap);
@@ -8562,7 +8554,7 @@ void ObjectMgr::LoadScriptNames()
         "UNION "
         "SELECT DISTINCT(script) FROM instance_template WHERE script <> '' "
         "UNION "
-        "SELECT DISTINCT(ScriptName) FROM capital_cities WHERE ScriptName <> '' "
+        "SELECT DISTINCT(ScriptName) FROM capital_city WHERE ScriptName <> '' "
         "UNION "
         "SELECT DISTINCT(ScriptName) FROM resource_points WHERE ScriptName <> '' ");
 
@@ -9198,39 +9190,4 @@ const SpecSkillTier* ObjectMgr::GetSpecSkillTier(uint32 tier) const
     if (itr == m_SpecSkillTierMap.end())
         return NULL;
     return &itr->second;
-}
-
-const MemoryCollector* ObjectMgr::GetMemoryCollector(int32 entry) const
-{
-    MemoryCollectorMap::const_iterator itr = m_MemoryCollectorMap.find(entry);
-    if (itr != m_MemoryCollectorMap.end())
-        return &itr->second;
-    return NULL;
-}
-
-void ObjectMgr::LoadMemoryCollector()
-{
-    m_MemoryCollectorMap.clear();
-    QueryResult result = WorldDatabase.Query("SELECT Entry, Item, ItemCount, RewardItem, RewardSpell, Text FROM memory_collection");
-    if (result)
-    {
-        do 
-        {
-            Field* fields = result->Fetch();
-            MemoryCollector memory;
-            memory.entry = fields[0].GetInt32();
-            memory.reqItem = fields[1].GetUInt32();
-            memory.count = fields[2].GetUInt32();
-            memory.item = fields[3].GetUInt32();
-            memory.spell = fields[4].GetUInt32();
-            memory.text = fields[5].GetUInt32();
-            m_MemoryCollectorMap.insert(std::pair<int32, MemoryCollector>(memory.entry, memory));
-        } while (result->NextRow());
-    }
-}
-
-bool ObjectMgr::IsMemoryCollector(int32 entry) const
-{
-    MemoryCollectorMap::const_iterator itr = m_MemoryCollectorMap.find(entry);
-    return itr != m_MemoryCollectorMap.end();
 }
