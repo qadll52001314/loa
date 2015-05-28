@@ -97,8 +97,8 @@ void GuildMgr::LoadGuilds()
 
                                                      //          0          1       2             3              4              5              6
         QueryResult result = CharacterDatabase.Query("SELECT g.guildid, g.name, g.leaderguid, g.EmblemStyle, g.EmblemColor, g.BorderStyle, g.BorderColor, "
-                                                     //   7                  8       9       10            11           12
-                                                     "g.BackgroundColor, g.info, g.motd, g.createdate, g.BankMoney, COUNT(gbt.guildid) "
+                                                     //   7                  8       9       10            11       12            13                  14
+                                                     "g.BackgroundColor, g.info, g.motd, g.createdate, g.BankMoney, g.RemoteBank, g.RemoteBankExpire, COUNT(gbt.guildid) "
                                                      "FROM guild g LEFT JOIN guild_bank_tab gbt ON g.guildid = gbt.guildid GROUP BY g.guildid ORDER BY g.guildid ASC");
 
         if (!result)
@@ -398,4 +398,13 @@ void GuildMgr::ResetTimes()
             guild->ResetTimes();
 
     CharacterDatabase.DirectExecute("TRUNCATE guild_member_withdraw");
+}
+
+void GuildMgr::Update()
+{
+    for (GuildContainer::const_iterator itr = GuildStore.begin(); itr != GuildStore.end(); ++itr)
+    {
+        if (Guild* guild = itr->second)
+            guild->Update();
+    }
 }

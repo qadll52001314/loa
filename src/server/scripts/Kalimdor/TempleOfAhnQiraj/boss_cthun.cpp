@@ -301,7 +301,7 @@ public:
                     if (PhaseTimer <= diff)
                     {
                         //Switch to Dark Beam
-                        instance->SetData(DATA_CTHUN_PHASE, PHASE_EYE_RED_BEAM);
+                        //instance->SetData(DATA_CTHUN_PHASE, PHASE_EYE_RED_BEAM);
 
                         me->InterruptNonMeleeSpells(false);
                         me->SetReactState(REACT_PASSIVE);

@@ -1521,6 +1521,23 @@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_COMPLETE_ACHIEVEMENT);
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EARN_ACHIEVEMENT_POINTS, achievement->points);
 
+    switch (achievement->ID)
+    {
+        case 1283:
+        case 1284:
+        case 1287:
+        case 1288:
+        case 1289:
+            m_player->LearnTalentToLevel();
+            break;
+        case 1285:
+        case 1286:
+            m_player->InitTalentForLevel();
+            break;
+        default:
+            break;
+    }
+
     // reward items and titles if any
     AchievementReward const* reward = sAchievementMgr->GetAchievementReward(achievement);
 

@@ -120,6 +120,15 @@ inline T CalculatePct(T base, U pct)
     return T(base * static_cast<float>(pct) / 100.0f);
 }
 
+template <class T, class U, class S>
+inline T QuadraticLinarBenefit(T limiter, S deno, U value = 1.0f)
+{
+    float v = static_cast<float>(value);
+    float d = static_cast<float>(deno);
+    if (v + d == 0) return 0;
+    return T(limiter * v / (v + d));
+}
+
 template <class T, class U>
 inline T AddPct(T &base, U pct)
 {

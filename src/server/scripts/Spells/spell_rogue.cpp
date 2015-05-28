@@ -25,6 +25,7 @@
 #include "ScriptMgr.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
+#include "SpellHistory.h"
 #include "Containers.h"
 
 enum RogueSpells
@@ -139,11 +140,11 @@ class spell_rog_cheat_death : public SpellScriptLoader
             void Absorb(AuraEffect* /*aurEff*/, DamageInfo & dmgInfo, uint32 & absorbAmount)
             {
                 Player* target = GetTarget()->ToPlayer();
-                if (dmgInfo.GetDamage() < target->GetHealth() || target->HasSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) ||  !roll_chance_i(absorbChance))
+                if (dmgInfo.GetDamage() < target->GetHealth() || target->GetSpellHistory()->HasCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN) || !roll_chance_i(absorbChance))
                     return;
 
                 target->CastSpell(target, SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, true);
-                target->AddSpellCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, 0, time(NULL) + 60);
+                target->GetSpellHistory()->AddCooldown(SPELL_ROGUE_CHEAT_DEATH_COOLDOWN, 0, std::chrono::minutes(1));
 
                 uint32 health10 = target->CountPctFromMaxHealth(10);
 
@@ -443,35 +444,21 @@ class spell_rog_preparation : public SpellScriptLoader
 
             void HandleDummy(SpellEffIndex /*effIndex*/)
             {
-                Player* caster = GetCaster()->ToPlayer();
-
-                //immediately finishes the cooldown on certain Rogue abilities
-                const SpellCooldowns& cm = caster->GetSpellCooldownMap();
-                for (SpellCooldowns::const_iterator itr = cm.begin(); itr != cm.end();)
+                Unit* caster = GetCaster();
+                caster->GetSpellHistory()->ResetCooldowns([caster](SpellHistory::CooldownStorageType::iterator itr) -> bool
                 {
                     SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first);
+                    if (spellInfo->SpellFamilyName != SPELLFAMILY_ROGUE)
+                        return false;
 
-                    if (spellInfo->SpellFamilyName == SPELLFAMILY_ROGUE)
-                    {
-                        if (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_COLDB_SHADOWSTEP ||      // Cold Blood, Shadowstep
-                            spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_VAN_EVAS_SPRINT)           // Vanish, Evasion, Sprint
-                            caster->RemoveSpellCooldown((itr++)->first, true);
-                        else if (caster->HasAura(SPELL_ROGUE_GLYPH_OF_PREPARATION))
-                        {
-                            if (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_DISMANTLE ||         // Dismantle
-                                spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_KICK ||               // Kick
-                                (spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_BLADE_FLURRY &&     // Blade Flurry
-                                spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_BLADE_FLURRY))
-                                caster->RemoveSpellCooldown((itr++)->first, true);
-                            else
-                                ++itr;
-                        }
-                        else
-                            ++itr;
-                    }
-                    else
-                        ++itr;
-                }
+                    return (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_COLDB_SHADOWSTEP ||  // Cold Blood, Shadowstep
+                        spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_VAN_EVAS_SPRINT) ||       // Vanish, Evasion, Sprint
+                        (caster->HasAura(SPELL_ROGUE_GLYPH_OF_PREPARATION) &&
+                        (spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_DISMANTLE ||            // Dismantle
+                        spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_KICK ||                   // Kick
+                        (spellInfo->SpellFamilyFlags[0] & SPELLFAMILYFLAG_ROGUE_BLADE_FLURRY &&          // Blade Flurry
+                        spellInfo->SpellFamilyFlags[1] & SPELLFAMILYFLAG1_ROGUE_BLADE_FLURRY)));
+                }, true);
             }
 
             void Register() override
@@ -716,6 +703,124 @@ class spell_rog_tricks_of_the_trade_proc : public SpellScriptLoader
         }
 };
 
+// 82027
+class spell_rog_assassins_creed : public SpellScriptLoader
+{
+public:
+    spell_rog_assassins_creed() : SpellScriptLoader("spell_rog_assassins_creed") {}
+    
+    class spell_rog_assassins_creed_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_assassins_creed_AuraScript);
+
+        void HandlePeriodic(AuraEffect const* aurEff)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            if (Unit* target = player->GetSelectedUnit())
+            {
+                if (player->IsValidAttackTarget(target))
+                {
+                    if (player->GetLastSelectedTarget() == target->GetGUID())
+                        player->AddAura(82033, player);
+                    else
+                    {
+                        player->SetLastSelectedTarget(target->GetGUID());
+                        player->RemoveAurasDueToSpell(82033);
+                        player->AddAura(82033, player);
+                    }
+                    return;
+                }
+            }
+
+            player->SetLastSelectedTarget(ObjectGuid::Empty);
+            player->RemoveAurasDueToSpell(82033);
+        }
+        
+        void Register() override
+        {
+            OnEffectPeriodic += AuraEffectPeriodicFn(spell_rog_assassins_creed_AuraScript::HandlePeriodic, EFFECT_1, SPELL_AURA_PERIODIC_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_assassins_creed_AuraScript();
+    }
+};
+
+// 82034
+class spell_rog_merciless_massecre : public SpellScriptLoader
+{
+public:
+    spell_rog_merciless_massecre() : SpellScriptLoader("spell_rog_merciless_massecre") {}
+    
+    class spell_rog_merciless_massecre_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_merciless_massecre_AuraScript);
+
+        void HandleRemove(AuraEffect const* aurEff, AuraEffectHandleModes mode)
+        {
+            PreventDefaultAction();
+            Aura* aura = aurEff->GetBase();
+            if (aura->GetStackAmount() == 1)
+                aura->Remove(AURA_REMOVE_BY_DEFAULT);
+            else
+                aura->SetStackAmount(GetStackAmount() - 1);
+        }
+        
+        void Register() override
+        {
+            OnEffectRemove += AuraEffectRemoveFn(spell_rog_merciless_massecre_AuraScript::HandleRemove, EFFECT_0, SPELL_AURA_MOD_DODGE_PERCENT, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_merciless_massecre_AuraScript();
+    }
+};
+
+// 82032
+class spell_rog_hand_of_the_club : public SpellScriptLoader
+{
+public:
+    spell_rog_hand_of_the_club() : SpellScriptLoader("spell_rog_hand_of_the_club") {}
+    
+    class spell_rog_hand_of_the_club_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_rog_hand_of_the_club_AuraScript);
+
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
+        {
+            if (eventInfo.GetSpellInfo() && eventInfo.GetSpellInfo()->Id == 82036)
+                return;
+
+            SpellSchoolMask mask = eventInfo.GetDamageInfo()->GetSchoolMask();
+            if (mask & SPELL_SCHOOL_MASK_NORMAL)
+            {
+                int32 damage = QuadraticLinarBenefit(30.0f, 100.0f, eventInfo.GetDamageInfo()->GetDamage());
+                if (damage < 1) damage = 1;
+                GetCaster()->CastCustomSpell(eventInfo.GetProcTarget(), 82036, &damage, NULL, NULL, true);
+            }
+            else if (mask & SPELL_SCHOOL_MASK_NATURE)
+            {
+                int32 damage = CalculatePct(eventInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+                GetCaster()->CastCustomSpell(GetCaster(), 82037, &damage, NULL, NULL, true);
+            }
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_rog_hand_of_the_club_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_rog_hand_of_the_club_AuraScript();
+    }
+};
+
 void AddSC_rogue_spell_scripts()
 {
     new spell_rog_blade_flurry();
@@ -729,4 +834,7 @@ void AddSC_rogue_spell_scripts()
     new spell_rog_shiv();
     new spell_rog_tricks_of_the_trade();
     new spell_rog_tricks_of_the_trade_proc();
+    new spell_rog_assassins_creed();
+    new spell_rog_merciless_massecre();
+    new spell_rog_hand_of_the_club();
 }

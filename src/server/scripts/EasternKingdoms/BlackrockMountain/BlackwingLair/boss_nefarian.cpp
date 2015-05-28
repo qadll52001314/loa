@@ -153,8 +153,9 @@ Position const DrakeSpawnLoc[2] = // drakonid
 
 Position const NefarianLoc[2] =
 {
-    {-7449.763672f, -1387.816040f, 526.783691f, 3.0f}, // nefarian spawn
-    {-7535.456543f, -1279.562500f, 476.798706f, 3.0f}  // nefarian move
+    { -7495.615723f, -1337.156738f, 507.922516f, 3.0f },
+    //{-7449.763672f, -1387.816040f, 526.783691f, 3.0f}, // nefarian spawn
+    {-7535.456543f, -1279.562500f, 477.798706f, 3.0f}  // nefarian move
 };
 
 uint32 const Entry[5] = {NPC_BRONZE_DRAKANOID, NPC_BLUE_DRAKANOID, NPC_RED_DRAKANOID, NPC_GREEN_DRAKANOID, NPC_BLACK_DRAKANOID};
@@ -351,7 +352,7 @@ public:
                                         nefarian->SetCanFly(true);
                                         nefarian->SetDisableGravity(true);
                                         nefarian->CastSpell((Unit*)NULL, SPELL_SHADOWFLAME_INITIAL);
-                                        nefarian->GetMotionMaster()->MovePoint(1, NefarianLoc[1]);
+                                        nefarian->GetMotionMaster()->MovePoint(1, NefarianLoc[1], false);
                                     }
                                     events.CancelEvent(EVENT_MIND_CONTROL);
                                     events.CancelEvent(EVENT_FEAR);
@@ -411,13 +412,20 @@ public:
             Initialize();
         }
 
-        void JustReachedHome() override
+        void EnterEvadeMode() override
         {
             canDespawn = true;
         }
 
+        //void JustReachedHome() override
+        //{
+        //    canDespawn = true;
+        //}
+
         void EnterCombat(Unit* /*who*/) override
         {
+            me->SetCanFly(false);
+            me->SetDisableGravity(false);
             events.ScheduleEvent(EVENT_SHADOWFLAME, 12000);
             events.ScheduleEvent(EVENT_FEAR, urand(25000, 35000));
             events.ScheduleEvent(EVENT_VEILOFSHADOW, urand(25000, 35000));

@@ -1047,6 +1047,66 @@ void ObjectMgr::LoadCreatureAddons()
     TC_LOG_INFO("server.loading", ">> Loaded %u creature addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
+void ObjectMgr::LoadGameObjectAddons()
+{
+    uint32 oldMSTime = getMSTime();
+
+    //                                               0     1                 2
+    QueryResult result = WorldDatabase.Query("SELECT guid, invisibilityType, invisibilityValue FROM gameobject_addon");
+
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 gameobject addon definitions. DB table `gameobject_addon` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+
+        ObjectGuid::LowType guid = fields[0].GetUInt64();
+
+        const GameObjectData* goData = GetGOData(guid);
+        if (!goData)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: " UI64FMTD ") does not exist but has a record in `gameobject_addon`", guid);
+            continue;
+        }
+
+        GameObjectAddon& gameObjectAddon = _gameObjectAddonStore[guid];
+        gameObjectAddon.invisibilityType = InvisibilityType(fields[1].GetUInt8());
+        gameObjectAddon.InvisibilityValue = fields[2].GetUInt32();
+
+        if (gameObjectAddon.invisibilityType >= TOTAL_INVISIBILITY_TYPES)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: " UI64FMTD ") has invalid InvisibilityType in `gameobject_addon`", guid);
+            gameObjectAddon.invisibilityType = INVISIBILITY_GENERAL;
+            gameObjectAddon.InvisibilityValue = 0;
+        }
+
+        if (gameObjectAddon.invisibilityType && !gameObjectAddon.InvisibilityValue)
+        {
+            TC_LOG_ERROR("sql.sql", "GameObject (GUID: " UI64FMTD ") has InvisibilityType set but has no InvisibilityValue in `gameobject_addon`, set to 1", guid);
+            gameObjectAddon.InvisibilityValue = 1;
+        }
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u gameobject addons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+GameObjectAddon const* ObjectMgr::GetGameObjectAddon(ObjectGuid::LowType lowguid)
+{
+    GameObjectAddonContainer::const_iterator itr = _gameObjectAddonStore.find(lowguid);
+    if (itr != _gameObjectAddonStore.end())
+        return &(itr->second);
+
+    return NULL;
+}
+
 CreatureAddon const* ObjectMgr::GetCreatureAddon(uint32 lowguid)
 {
     CreatureAddonContainer::const_iterator itr = _creatureAddonStore.find(lowguid);
@@ -1901,6 +1961,11 @@ uint32 ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, float y, float
     data.currentwaypoint = 0;
     data.curhealth = stats->GenerateHealth(cInfo);
     data.curmana = stats->GenerateMana(cInfo);
+    if (CreatureStrengthData const* strengthData = sObjectMgr->GetCreatureStrengthData(mapId))
+    {
+        data.curhealth = strengthData->hpFactor;
+        data.curmana = strengthData->mpFactor;
+    }
     data.movementType = cInfo->MovementType;
     data.spawnMask = 1;
     data.phaseMask = PHASEMASK_NORMAL;
@@ -3783,6 +3848,26 @@ void ObjectMgr::LoadPlayerInfo()
             }
         }
 
+        result = WorldDatabase.Query("SELECT level, xp FROM player_supremacy_level_xp");
+        _playerXPperSupremacyLevel.resize(3000);
+        if (result)
+        {
+            do 
+            {
+                Field* fields = result->Fetch();
+                uint32 level = fields[0].GetUInt32();
+                uint32 xp = fields[1].GetUInt32();
+                if (level < 3000)
+                    _playerXPperSupremacyLevel[level] = xp;
+            } while (result->NextRow());
+        }
+
+        for (uint32 level = 1; level != 3000; ++level)
+        {
+            if (_playerXPperSupremacyLevel[level] == 0)
+                _playerXPperSupremacyLevel[level] = _playerXPperSupremacyLevel[level - 1] + 1000;
+        }
+
         TC_LOG_INFO("server.loading", ">> Loaded %u xp for level definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
     }
 }
@@ -4939,11 +5024,11 @@ void ObjectMgr::LoadEventScripts()
         {
             TaxiPathNodeEntry const& node = sTaxiPathNodesByPath[path_idx][node_idx];
 
-            if (node.arrivalEventID)
-                evt_scripts.insert(node.arrivalEventID);
+            if (node.ArrivalEventID)
+                evt_scripts.insert(node.ArrivalEventID);
 
-            if (node.departureEventID)
-                evt_scripts.insert(node.departureEventID);
+            if (node.DepartureEventID)
+                evt_scripts.insert(node.DepartureEventID);
         }
     }
 
@@ -6709,6 +6794,37 @@ void ObjectMgr::LoadGameObjectTemplate()
     while (result->NextRow());
 
     TC_LOG_INFO("server.loading", ">> Loaded %u game object templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
+
+void ObjectMgr::LoadCreatureStrengthData()
+{
+    uint32 oldMSTime = getMSTime();
+
+    QueryResult result = WorldDatabase.Query("SELECT Map, Hp, Mp, Damage, Armor, Resistance FROM creature_strength_data");
+
+    if (!result)
+    {
+        TC_LOG_ERROR("server.loading", ">> Loaded 0 Creature Strength Data. DB table `creature_strength_data` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+
+    do 
+    {
+        CreatureStrengthData data;
+        Field* fields = result->Fetch();
+        data.map = fields[0].GetUInt32();
+        data.hpFactor = fields[1].GetFloat();
+        data.mpFactor = fields[2].GetFloat();
+        data.damageFactor = fields[3].GetFloat();
+        data.armorFactor = fields[4].GetFloat();
+        data.resistanceFactor = fields[5].GetFloat();
+        _creatureStrengthDataStore[data.map] = data;
+        ++count;
+    } while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u Creature Strength Data in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadExplorationBaseXP()
@@ -9039,6 +9155,14 @@ CreatureTemplate const* ObjectMgr::GetCreatureTemplate(uint32 entry)
     if (itr != _creatureTemplateStore.end())
         return &(itr->second);
 
+    return NULL;
+}
+
+CreatureStrengthData const* ObjectMgr::GetCreatureStrengthData(uint32 map)
+{
+    CreatureStrengthDataMap::const_iterator itr = _creatureStrengthDataStore.find(map);
+    if (itr != _creatureStrengthDataStore.end())
+        return &itr->second;
     return NULL;
 }
 

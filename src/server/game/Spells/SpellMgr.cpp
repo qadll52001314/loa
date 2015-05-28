@@ -571,6 +571,9 @@ uint8 SpellMgr::GetSpellRank(uint32 spell_id) const
 
 uint32 SpellMgr::GetSpellWithRank(uint32 spell_id, uint32 rank, bool strict) const
 {
+    if (!rank)
+        return 0;
+
     if (SpellChainNode const* node = GetSpellChainNode(spell_id))
     {
         if (rank != node->rank)
@@ -1521,10 +1524,10 @@ void SpellMgr::LoadSpellLearnSpells()
     {
         Field* fields = result->Fetch();
 
-        uint32 spell_id = fields[0].GetUInt16();
+        uint32 spell_id = fields[0].GetUInt32();
 
         SpellLearnSpellNode node;
-        node.spell       = fields[1].GetUInt16();
+        node.spell       = fields[1].GetUInt32();
         node.active      = fields[2].GetBool();
         node.autoLearned = false;
 
@@ -2954,6 +2957,10 @@ void SpellMgr::LoadSpellInfoCorrections()
 
         switch (spellInfo->Id)
         {
+            case 63026: // Force Cast (HACK: Target shouldn't be changed)
+            case 63137: // Force Cast (HACK: Target shouldn't be changed; summon position should be untied from spell destination)
+                spellInfo->Effects[0].TargetA = SpellImplicitTargetInfo(TARGET_DEST_DB);
+                break;
             case 53096: // Quetz'lun's Judgment
             case 70743: // AoD Special
             case 70614: // AoD Special - Vegard
@@ -3130,6 +3137,7 @@ void SpellMgr::LoadSpellInfoCorrections()
             case 64823: // Item - Druid T8 Balance 4P Bonus
             case 34477: // Misdirection
             case 44401: // Missile Barrage
+            case 18820: // Insight
                 spellInfo->ProcCharges = 1;
                 break;
             case 44544: // Fingers of Frost

@@ -128,7 +128,7 @@ class boss_ossirian : public CreatureScript
                 if (action == ACTION_TRIGGER_WEAKNESS)
                     if (Creature* Trigger = me->GetMap()->GetCreature(TriggerGUID))
                         if (!Trigger->HasUnitState(UNIT_STATE_CASTING))
-                            Trigger->CastSpell(Trigger, SpellWeakness[urand(0, 4)], false);
+                            Trigger->CastSpell(me, SpellWeakness[urand(0, 4)], false);
             }
 
             void EnterCombat(Unit* /*who*/) override

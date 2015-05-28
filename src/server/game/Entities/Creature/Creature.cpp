@@ -151,8 +151,6 @@ m_originalEntry(0), m_homePosition(), m_transportHomePosition(), m_creatureInfo(
     for (uint8 i = 0; i < CREATURE_MAX_SPELLS; ++i)
         m_spells[i] = 0;
 
-    m_CreatureSpellCooldowns.clear();
-    m_CreatureCategoryCooldowns.clear();
     DisableReputationGain = false;
 
     m_SightDistance = sWorld->getFloatConfig(CONFIG_SIGHT_MONSTER);
@@ -389,13 +387,24 @@ bool Creature::UpdateEntry(uint32 entry, CreatureData const* data /*= nullptr*/)
     SetMeleeDamageSchool(SpellSchools(cInfo->dmgschool));
     CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(getLevel(), cInfo->unit_class);
     float armor = (float)stats->GenerateArmor(cInfo); /// @todo Why is this treated as uint32 when it's a float?
+    float resistFactor = 1.0f;
+    uint32 mapid = data ? data->mapid : GetMapId();
+    if (CreatureStrengthData const* strengthData = sObjectMgr->GetCreatureStrengthData(mapid))
+    {
+        if (!IsPet())
+        {
+            armor *= strengthData->armorFactor;
+            resistFactor *= strengthData->resistanceFactor;
+        }
+    }
+
     SetModifierValue(UNIT_MOD_ARMOR,             BASE_VALUE, armor);
-    SetModifierValue(UNIT_MOD_RESISTANCE_HOLY,   BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_HOLY]));
-    SetModifierValue(UNIT_MOD_RESISTANCE_FIRE,   BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_FIRE]));
-    SetModifierValue(UNIT_MOD_RESISTANCE_NATURE, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_NATURE]));
-    SetModifierValue(UNIT_MOD_RESISTANCE_FROST,  BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_FROST]));
-    SetModifierValue(UNIT_MOD_RESISTANCE_SHADOW, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_SHADOW]));
-    SetModifierValue(UNIT_MOD_RESISTANCE_ARCANE, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_ARCANE]));
+    SetModifierValue(UNIT_MOD_RESISTANCE_HOLY, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_HOLY])*resistFactor);
+    SetModifierValue(UNIT_MOD_RESISTANCE_FIRE, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_FIRE])*resistFactor);
+    SetModifierValue(UNIT_MOD_RESISTANCE_NATURE, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_NATURE])*resistFactor);
+    SetModifierValue(UNIT_MOD_RESISTANCE_FROST, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_FROST])*resistFactor);
+    SetModifierValue(UNIT_MOD_RESISTANCE_SHADOW, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_SHADOW])*resistFactor);
+    SetModifierValue(UNIT_MOD_RESISTANCE_ARCANE, BASE_VALUE, float(cInfo->resistance[SPELL_SCHOOL_ARCANE])*resistFactor);
 
     SetCanModifyStats(true);
     UpdateAllStats();
@@ -1088,6 +1097,15 @@ void Creature::SelectLevel()
 
     uint32 basehp = stats->GenerateHealth(cInfo);
     uint32 health = uint32(basehp * healthmod);
+    uint32 mana = stats->GenerateMana(cInfo);
+    float basedamage = stats->GenerateBaseDamage(cInfo);
+
+    if (CreatureStrengthData const* data = sObjectMgr->GetCreatureStrengthData(GetMapId()))
+    {
+        health *= data->hpFactor;
+        mana *= data->mpFactor;
+        basedamage *= data->damageFactor;
+    }
 
     SetCreateHealth(health);
     SetMaxHealth(health);
@@ -1095,8 +1113,6 @@ void Creature::SelectLevel()
     ResetPlayerDamageReq();
 
     // mana
-    uint32 mana = stats->GenerateMana(cInfo);
-
     SetCreateMana(mana);
     SetMaxPower(POWER_MANA, mana); // MAX Mana
     SetPower(POWER_MANA, mana);
@@ -1107,9 +1123,6 @@ void Creature::SelectLevel()
     SetModifierValue(UNIT_MOD_MANA, BASE_VALUE, (float)mana);
 
     // damage
-
-    float basedamage = stats->GenerateBaseDamage(cInfo);
-
     float weaponBaseMinDamage = basedamage;
     float weaponBaseMaxDamage = basedamage * 1.5f;
 
@@ -1362,6 +1375,8 @@ bool Creature::LoadCreatureFromDB(uint32 guid, Map* map, bool addToMap)
             curhealth = uint32(curhealth*_GetHealthMod(GetCreatureTemplate()->rank, GetCreatureTemplate()->expansion));
             if (curhealth < 1)
                 curhealth = 1;
+            if (CreatureStrengthData const* data = sObjectMgr->GetCreatureStrengthData(map->GetId()))
+                curhealth *= data->hpFactor;
         }
         SetPower(POWER_MANA, data->curmana);
     }
@@ -2274,83 +2289,6 @@ void Creature::SetInCombatWithZone()
 uint32 Creature::GetShieldBlockValue() const                  //dunno mob block value
 {
     return (getLevel()/2 + uint32(GetStat(STAT_STRENGTH)/20));
-}
-
-void Creature::_AddCreatureSpellCooldown(uint32 spell_id, time_t end_time)
-{
-    m_CreatureSpellCooldowns[spell_id] = end_time;
-}
-
-void Creature::_AddCreatureCategoryCooldown(uint32 category, time_t apply_time)
-{
-    m_CreatureCategoryCooldowns[category] = apply_time;
-}
-
-void Creature::AddCreatureSpellCooldown(uint32 spellid)
-{
-    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellid);
-    if (!spellInfo)
-        return;
-
-    uint32 cooldown = spellInfo->GetRecoveryTime();
-    if (Player* modOwner = GetSpellModOwner())
-        modOwner->ApplySpellMod(spellid, SPELLMOD_COOLDOWN, cooldown);
-
-    if (cooldown)
-        _AddCreatureSpellCooldown(spellid, time(NULL) + cooldown/IN_MILLISECONDS);
-
-    if (spellInfo->GetCategory())
-        _AddCreatureCategoryCooldown(spellInfo->GetCategory(), time(NULL));
-}
-
-bool Creature::HasCategoryCooldown(uint32 spell_id) const
-{
-    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spell_id);
-    if (!spellInfo)
-        return false;
-
-    CreatureSpellCooldowns::const_iterator itr = m_CreatureCategoryCooldowns.find(spellInfo->GetCategory());
-    return(itr != m_CreatureCategoryCooldowns.end() && time_t(itr->second + (spellInfo->CategoryRecoveryTime / IN_MILLISECONDS)) > time(NULL));
-}
-
-uint32 Creature::GetCreatureSpellCooldownDelay(uint32 spellId) const
-{
-    CreatureSpellCooldowns::const_iterator itr = m_CreatureSpellCooldowns.find(spellId);
-    time_t t = time(NULL);
-    return uint32(itr != m_CreatureSpellCooldowns.end() && itr->second > t ? itr->second - t : 0);
-}
-
-bool Creature::HasSpellCooldown(uint32 spell_id) const
-{
-    CreatureSpellCooldowns::const_iterator itr = m_CreatureSpellCooldowns.find(spell_id);
-    return (itr != m_CreatureSpellCooldowns.end() && itr->second > time(NULL)) || HasCategoryCooldown(spell_id);
-}
-
-void Creature::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs)
-{
-    time_t curTime = time(NULL);
-    for (uint8 i = 0; i < CREATURE_MAX_SPELLS; ++i)
-    {
-        if (m_spells[i] == 0)
-            continue;
-
-        uint32 unSpellId = m_spells[i];
-        SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(unSpellId);
-
-        // Not send cooldown for this spells
-        if (spellInfo->IsCooldownStartedOnEvent())
-            continue;
-
-        if (spellInfo->PreventionType != SPELL_PREVENTION_TYPE_SILENCE)
-            continue;
-
-        if ((idSchoolMask & spellInfo->GetSchoolMask()) && GetCreatureSpellCooldownDelay(unSpellId) < unTimeMs)
-        {
-            _AddCreatureSpellCooldown(unSpellId, curTime + unTimeMs/IN_MILLISECONDS);
-            if (UnitAI* ai = GetAI())
-                ai->SpellInterrupted(unSpellId, unTimeMs);
-        }
-    }
 }
 
 bool Creature::HasSpell(uint32 spellID) const

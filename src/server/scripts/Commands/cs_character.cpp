@@ -237,6 +237,8 @@ public:
             player->InitTalentForLevel();
             player->SetUInt32Value(PLAYER_XP, 0);
 
+            player->AddSpellsForLevel();
+
             if (handler->needReportToTarget(player))
             {
                 if (oldLevel == newLevel)

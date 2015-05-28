@@ -53,12 +53,14 @@ EndContentData */
 #include "GridNotifiersImpl.h"
 #include "Cell.h"
 #include "CellImpl.h"
+#include "SpellHistory.h"
 #include "SpellAuras.h"
 #include "Pet.h"
 #include "CreatureTextMgr.h"
 #include "CapitalCityMgr.h"
 #include "ChatLink.h"
 #include "MemoryMgr.h"
+#include "Guild.h"
 
 /*########
 # npc_air_force_bots
@@ -1217,14 +1219,14 @@ public:
         if (creature->IsQuestGiver())
             player->PrepareQuestMenu(creature->GetGUID());
 
-        if (player->HasSpellCooldown(SPELL_INT) ||
-            player->HasSpellCooldown(SPELL_ARM) ||
-            player->HasSpellCooldown(SPELL_DMG) ||
-            player->HasSpellCooldown(SPELL_RES) ||
-            player->HasSpellCooldown(SPELL_STR) ||
-            player->HasSpellCooldown(SPELL_AGI) ||
-            player->HasSpellCooldown(SPELL_STM) ||
-            player->HasSpellCooldown(SPELL_SPI))
+        if (player->GetSpellHistory()->HasCooldown(SPELL_INT) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_ARM) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_DMG) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_RES) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_STR) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_AGI) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_STM) ||
+            player->GetSpellHistory()->HasCooldown(SPELL_SPI))
             player->SEND_GOSSIP_MENU(7393, creature->GetGUID());
         else
         {
@@ -1284,51 +1286,43 @@ public:
     bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
     {
         player->PlayerTalkClass->ClearMenus();
+        uint32 spellId = 0;
         switch (sender)
         {
             case GOSSIP_SENDER_MAIN:
                 SendAction(player, creature, action);
                 break;
             case GOSSIP_SENDER_MAIN + 1:
-                creature->CastSpell(player, SPELL_DMG, false);
-                player->AddSpellCooldown(SPELL_DMG, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_DMG;
                 break;
             case GOSSIP_SENDER_MAIN + 2:
-                creature->CastSpell(player, SPELL_RES, false);
-                player->AddSpellCooldown(SPELL_RES, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_RES;
                 break;
             case GOSSIP_SENDER_MAIN + 3:
-                creature->CastSpell(player, SPELL_ARM, false);
-                player->AddSpellCooldown(SPELL_ARM, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_ARM;
                 break;
             case GOSSIP_SENDER_MAIN + 4:
-                creature->CastSpell(player, SPELL_SPI, false);
-                player->AddSpellCooldown(SPELL_SPI, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_SPI;
                 break;
             case GOSSIP_SENDER_MAIN + 5:
-                creature->CastSpell(player, SPELL_INT, false);
-                player->AddSpellCooldown(SPELL_INT, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_INT;
                 break;
             case GOSSIP_SENDER_MAIN + 6:
-                creature->CastSpell(player, SPELL_STM, false);
-                player->AddSpellCooldown(SPELL_STM, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_STM;
                 break;
             case GOSSIP_SENDER_MAIN + 7:
-                creature->CastSpell(player, SPELL_STR, false);
-                player->AddSpellCooldown(SPELL_STR, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_STR;
                 break;
             case GOSSIP_SENDER_MAIN + 8:
-                creature->CastSpell(player, SPELL_AGI, false);
-                player->AddSpellCooldown(SPELL_AGI, 0, time(NULL) + 7200);
-                SendAction(player, creature, action);
+                spellId = SPELL_AGI;
                 break;
+        }
+
+        if (spellId)
+        {
+            creature->CastSpell(player, spellId, false);
+            player->GetSpellHistory()->AddCooldown(spellId, 0, std::chrono::hours(2));
+            SendAction(player, creature, action);
         }
         return true;
     }
@@ -2383,32 +2377,10 @@ public:
 
 enum NpcShilvasaExatierGossip
 {
-    GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST = 1002,
-    GOSSIP_ACTION_SPEC_NAV_TO_TIER1 = 1003,
-    GOSSIP_ACTION_SPEC_NAV_TO_TIER2 = 1004,
-    GOSSIP_ACTION_SPEC_NAV_TO_TIER3 = 1005,
-    GOSSIP_ACTION_SPEC_NAV_TO_TIER4 = 1006,
-    GOSSIP_ACTION_SPEC_NAV_TO_TIER5 = 1007,
-    GOSSIP_ACTION_SPEC_UNLEARN_TIER1 = 1008,
-    GOSSIP_ACTION_SPEC_UNLEARN_TIER2 = 1009,
-    GOSSIP_ACTION_SPEC_UNLEARN_TIER3 = 1010,
-    GOSSIP_ACTION_SPEC_UNLEARN_TIER4 = 1011,
-    GOSSIP_ACTION_SPEC_UNLEARN_TIER5 = 1012,
-    GOSSIP_ACTION_QUEST_GOSSIP_0 = 1013,
-    GOSSIP_ACTION_QUEST_GOSSIP_1 = 1014,
-    GOSSIP_ACTION_QUEST_GOSSIP_2 = 1015,
-    GOSSIP_ACTION_QUEST_GOSSIP_3 = 1016,
-    GOSSIP_ACTION_QUEST_GOSSIP_4 = 1017,
-    GOSSIP_ACTION_QUEST_GOSSIP_5 = 1018,
-    GOSSIP_ACTION_QUEST_GOSSIP_6 = 1019,
-    GOSSIP_ACTION_VIEW_SPEC_LIST = 2000,
-    GOSSIP_ACTION_SPEC_TIER1_START = 3000,
-    GOSSIP_ACTION_SPEC_TIER2_START = 4000,
-    GOSSIP_ACTION_SPEC_TIER3_START = 5000,
-    GOSSIP_ACTION_SPEC_TIER4_START = 6000,
-    GOSSIP_ACTION_SPEC_TIER5_START = 7000,
-    GOSSIP_ACTION_SPEC_LEARN_START = 8000,
-    GOSSIP_ACTION_SPEC_END = 9000
+    GOSSIP_ACTION_REMEMBER_TALENT_CATEGORY = 1002,
+    GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1 = 1003,
+    GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2 = 1004,
+    GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3 = 1005
 };
 
 class npc_shilvasa_exatier : public CreatureScript
@@ -2420,229 +2392,112 @@ public:
     {
         player->PlayerTalkClass->ClearMenus();
         player->PrepareQuestMenu(creature->GetGUID());
-        if (player->GetQuestStatus(26083) == QUEST_STATUS_REWARDED)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(40), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST);
-        else if (player->GetQuestStatus(26083) == QUEST_STATUS_INCOMPLETE)
-            player->ADD_GOSSIP_ITEM_DB(55103, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_0);
+        if (player->GetPreferedTalentCategory() == -1)
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_BATTLE, sObjectMgr->GetServerMessage(68), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_REMEMBER_TALENT_CATEGORY);
+        if (player->getLevel() >= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            player->ADD_GOSSIP_ITEM_DB(55103, 1, GOSSIP_SENDER_MAIN, GOSSIP_OPTION_VENDOR);
         player->SEND_GOSSIP_MENU(31176, creature->GetGUID());
         return true;
     }
 
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action)
-    {
-        if (action < GOSSIP_ACTION_VIEW_SPEC_LIST)
-        {
-            switch (action)
-            {
-                case GOSSIP_ACTION_QUEST_GOSSIP_0:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55104, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_1);
-                    player->SEND_GOSSIP_MENU(31177, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_1:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55105, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_2);
-                    player->SEND_GOSSIP_MENU(31178, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_2:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55106, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_3);
-                    player->SEND_GOSSIP_MENU(31179, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_3:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55107, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_4);
-                    player->SEND_GOSSIP_MENU(31180, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_4:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55108, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_5);
-                    player->SEND_GOSSIP_MENU(31181, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_5:
-                    player->PlayerTalkClass->ClearMenus();
-                    player->ADD_GOSSIP_ITEM_DB(55109, 0, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_QUEST_GOSSIP_6);
-                    player->SEND_GOSSIP_MENU(31182, creature->GetGUID());
-                    break;
-                case GOSSIP_ACTION_QUEST_GOSSIP_6:
-                    BuildSpecList(player, creature);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST:
-                    BuildSpecList(player, creature);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_TIER1:
-                    BuildSpecMenu(player, creature, 1);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_TIER2:
-                    BuildSpecMenu(player, creature, 2);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_TIER3:
-                    BuildSpecMenu(player, creature, 3);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_TIER4:
-                    BuildSpecMenu(player, creature, 4);
-                    break;
-                case GOSSIP_ACTION_SPEC_NAV_TO_TIER5:
-                    BuildSpecMenu(player, creature, 5);
-                    break;
-                case GOSSIP_ACTION_SPEC_UNLEARN_TIER1:
-                    player->UnlearnSpecTier(1);
-                    player->CLOSE_GOSSIP_MENU();
-                    break;
-                case GOSSIP_ACTION_SPEC_UNLEARN_TIER2:
-                    player->UnlearnSpecTier(2);
-                    player->CLOSE_GOSSIP_MENU();
-                    break;
-                case GOSSIP_ACTION_SPEC_UNLEARN_TIER3:
-                    player->UnlearnSpecTier(3);
-                    player->CLOSE_GOSSIP_MENU();
-                    break;
-                case GOSSIP_ACTION_SPEC_UNLEARN_TIER4:
-                    player->UnlearnSpecTier(4);
-                    player->CLOSE_GOSSIP_MENU();
-                    break;
-                case GOSSIP_ACTION_SPEC_UNLEARN_TIER5:
-                    player->UnlearnSpecTier(5);
-                    player->CLOSE_GOSSIP_MENU();
-                    break;
-                default:
-                    break;
-            }
-        }
-        else if (action < GOSSIP_ACTION_SPEC_TIER1_START)
-        {
-            uint32 tier = action - GOSSIP_ACTION_VIEW_SPEC_LIST;
-            BuildSpecMenu(player, creature, tier);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_TIER2_START)
-        {
-            uint32 id = action - GOSSIP_ACTION_SPEC_TIER1_START;
-            ViewSpec(player, creature, 1, id);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_TIER3_START)
-        {
-            uint32 id = action - GOSSIP_ACTION_SPEC_TIER2_START;
-            ViewSpec(player, creature, 2, id);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_TIER4_START)
-        {
-            uint32 id = action - GOSSIP_ACTION_SPEC_TIER3_START;
-            ViewSpec(player, creature, 3, id);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_TIER5_START)
-        {
-            uint32 id = action - GOSSIP_ACTION_SPEC_TIER4_START;
-            ViewSpec(player, creature, 4, id);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_LEARN_START)
-        {
-            uint32 id = action - GOSSIP_ACTION_SPEC_TIER5_START;
-            ViewSpec(player, creature, 5, id);
-        }
-        else if (action < GOSSIP_ACTION_SPEC_END)
-        {
-            uint32 skill = action - GOSSIP_ACTION_SPEC_LEARN_START;
-            // learn skill
-            player->SetSkill(skill, 1, 1, 100);
-            creature->SendPlaySpellImpact(player->GetGUID(), 362);
-            if (player->GetQuestStatus(26083) == QUEST_STATUS_INCOMPLETE)
-                player->CompleteQuest(26083);
-            player->CLOSE_GOSSIP_MENU();
-        }
-
-        return true;
-    }
-
-    void BuildSpecList(Player* player, Creature* creature)
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
     {
         player->PlayerTalkClass->ClearMenus();
-        const SpecSkillTierMap* list = sObjectMgr->GetSpecSkillMap();
-        for (SpecSkillTierMap::const_iterator itr = list->begin(); itr != list->end(); ++itr)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second.name, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_VIEW_SPEC_LIST + itr->first);
-        player->SEND_GOSSIP_MENU(31152, creature->GetGUID());
-    }
-
-    void BuildSpecMenu(Player* player, Creature* creature, uint32 tier)
-    {
-        player->PlayerTalkClass->ClearMenus();
-        SpecSkillDataBounds bound = sObjectMgr->GetSpecSkillDataBounds(tier);
-        if (bound.first == bound.second)
-            return;
-
-        uint32 action = 0;
-        uint32 text = 0;
-        uint32 unlearn = 0;
-        switch (tier)
+        switch (action)
         {
-            case 1:
-                action = GOSSIP_ACTION_SPEC_TIER1_START;
-                text = 31153;
-                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER1;
+            case GOSSIP_OPTION_VENDOR:
+                player->GetSession()->SendListInventory(creature->GetGUID());
                 break;
-            case 2:
-                action = GOSSIP_ACTION_SPEC_TIER2_START;
-                text = 31154;
-                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER2;
+            case GOSSIP_ACTION_REMEMBER_TALENT_CATEGORY:
+                player->PlayerTalkClass->ClearMenus();
+                switch (player->getClass())
+                {
+                    case CLASS_MAGE:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(69), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(70), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(71), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_WARRIOR:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(72), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(73), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(74), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_PALADIN:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(75), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(76), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(77), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_ROGUE:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(78), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(79), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(80), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_PRIEST:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(81), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(82), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(83), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_SHAMAN:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(84), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(85), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(86), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_DRUID:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(87), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(88), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(89), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_WARLOCK:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(90), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(91), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(92), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_HUNTER:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(93), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(94), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(95), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    case CLASS_DEATH_KNIGHT:
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(96), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(97), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2);
+                        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, sObjectMgr->GetServerMessage(98), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3);
+                        break;
+                    default:
+                        break;
+                }
+                player->SEND_GOSSIP_MENU(31311, creature->GetGUID());
                 break;
-            case 3:
-                action = GOSSIP_ACTION_SPEC_TIER3_START;
-                text = 31155;
-                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER3;
+            case GOSSIP_ACTION_SELECT_TALENT_CATEGORY_1:
+                if (player->GetPreferedTalentCategory() == -1)
+                {
+                    player->SetPreperedTalentCategory(0);
+                    ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(99).c_str());
+                    player->CompleteAchievement(4867);
+                    player->PlayerTalkClass->SendCloseGossip();
+                }
                 break;
-            case 4:
-                action = GOSSIP_ACTION_SPEC_TIER4_START;
-                text = 31156;
-                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER4;
-                break;
-            case 5:
-                action = GOSSIP_ACTION_SPEC_TIER5_START;
-                text = 31157;
-                unlearn = GOSSIP_ACTION_SPEC_UNLEARN_TIER5;
+            case GOSSIP_ACTION_SELECT_TALENT_CATEGORY_2:
+                if (player->GetPreferedTalentCategory() == -1)
+                {
+                    player->SetPreperedTalentCategory(1);
+                    ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(99).c_str());
+                    player->CompleteAchievement(4867);
+                    player->PlayerTalkClass->SendCloseGossip();
+                }
+            case GOSSIP_ACTION_SELECT_TALENT_CATEGORY_3:
+                if (player->GetPreferedTalentCategory() == -1)
+                {
+                    player->SetPreperedTalentCategory(2);
+                    ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(99).c_str());
+                    player->CompleteAchievement(4867);
+                    player->PlayerTalkClass->SendCloseGossip();
+                }
                 break;
             default:
+                player->PlayerTalkClass->SendCloseGossip();
                 break;
         }
-
-        for (SpecSkillDataMap::const_iterator itr = bound.first; itr != bound.second; ++itr)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, itr->second.name, GOSSIP_SENDER_MAIN, action + itr->second.id);
-        if (player->HasSpecSkill(tier))
-            player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(37, sObjectMgr->GetSpecTierName(tier).c_str()), GOSSIP_SENDER_MAIN, unlearn, sObjectMgr->GetServerMessage(38, sObjectMgr->GetSpecTierName(tier).c_str()), 0, false);
-        player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_NAV_TO_SPEC_LIST);
-        player->SEND_GOSSIP_MENU(text, creature->GetGUID());
-    }
-
-    void ViewSpec(Player* player, Creature* creature, uint32 tier, uint32 id)
-    {
-        player->PlayerTalkClass->ClearMenus();
-        const SpecSkillData* data = sObjectMgr->GetSpecSkillData(tier, id);
-        if (data)
-        {
-            uint32 nav = 0;
-            switch (tier)
-            {
-                case 1:
-                    nav = GOSSIP_ACTION_SPEC_NAV_TO_TIER1;
-                    break;
-                case 2:
-                    nav = GOSSIP_ACTION_SPEC_NAV_TO_TIER2;
-                    break;
-                case 3:
-                    nav = GOSSIP_ACTION_SPEC_NAV_TO_TIER3;
-                    break;
-                case 4:
-                    nav = GOSSIP_ACTION_SPEC_NAV_TO_TIER4;
-                    break;
-                case 5:
-                    nav = GOSSIP_ACTION_SPEC_NAV_TO_TIER5;
-                    break;
-                default:
-                    break;
-            }
-            if (player->CanLearnSpec(tier))
-                player->ADD_GOSSIP_ITEM_EXTENDED(GOSSIP_ICON_DOT, sObjectMgr->GetServerMessage(35), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SPEC_LEARN_START + data->skill, sObjectMgr->GetServerMessage(36, sObjectMgr->GetSpecTierName(tier).c_str(), data->name.c_str()), 0, false);
-            player->ADD_GOSSIP_ITEM_DB(55079, 1, GOSSIP_SENDER_MAIN, nav);
-            player->SEND_GOSSIP_MENU(data->description, creature->GetGUID());
-        }
+        return true;
     }
 };
 
@@ -2852,6 +2707,42 @@ public:
     }
 };
 
+class npc_remote_banker : public CreatureScript
+{
+public:
+    npc_remote_banker() : CreatureScript("npc_remote_banker") {}
+
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+        player->PrepareQuestMenu(creature->GetGUID());
+        if (player->GetGuild() && player->GetGUID() == player->GetGuild()->GetLeaderGUID() && !player->GetGuild()->HasRemoteBank())
+            player->ADD_GOSSIP_ITEM_DB(55134, 0, GOSSIP_SENDER_MAIN, 1001);
+        player->SEND_GOSSIP_MENU(31310, creature->GetGUID());
+        return true;
+    }
+
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action) override
+    {
+        if (action == 1001)
+        {
+            if (!player->HasItemCount(60319, 25000))
+            {
+                ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(102).c_str());
+                player->PlayerTalkClass->SendCloseGossip();
+                return true;
+            }
+            else
+            {
+                player->DestroyItemCount(60319, 25000, true);
+                player->GetGuild()->SetRemoteBank(true);
+            }
+        }
+        player->PlayerTalkClass->SendCloseGossip();
+        return true;
+    }
+};
+
 void AddSC_npcs_special()
 {
     new npc_air_force_bots();
@@ -2879,4 +2770,5 @@ void AddSC_npcs_special()
     new npc_xxe();
     new npc_spectral_mechant();
     new npc_memory_code_fetcher();
+    new npc_remote_banker();
 }

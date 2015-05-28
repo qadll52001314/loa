@@ -7,7 +7,7 @@ void MemoryMgr::LoadDefine()
 {
     m_CollectableMemoryMap.clear();
 
-    QueryResult result = WorldDatabase.Query("SELECT ID, ReqItem, ReqItemCount, RewardItem, RewardItemCount, RewardSpell, Mail, Sender, Text FROM memory");
+    QueryResult result = WorldDatabase.Query("SELECT ID, ReqItem, ReqItemCount, RewardItem, RewardItemCount, RewardSpell, Mail, Sender, Text, Achievement FROM memory");
     if (result)
     {
         do 
@@ -23,6 +23,7 @@ void MemoryMgr::LoadDefine()
             memory.mail = fields[6].GetUInt32();
             memory.sender = fields[7].GetUInt32();
             memory.text = fields[8].GetUInt32();
+            memory.achievement = fields[9].GetUInt32();
             m_CollectableMemoryMap.insert(std::pair<uint32, CollectableMemory>(memory.id, memory));
         } while (result->NextRow());
     }
@@ -121,8 +122,8 @@ void MemoryMgr::FetchMemoryFromCode(Player* player, std::string code)
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_MEMORY_CODE);
                 stmt->setUInt32(0, itr->second.memory);
                 stmt->setInt32(1, itr->second.count);
-                stmt->setString(2, code);
-                stmt->setUInt32(3, player->GetGUID()); // only record last collector
+                stmt->setUInt32(2, player->GetGUID());
+                stmt->setString(3, code); // only record last collector
                 CharacterDatabase.Execute(stmt);
             }
 

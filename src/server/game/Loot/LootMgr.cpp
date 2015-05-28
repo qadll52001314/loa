@@ -364,7 +364,7 @@ LootItem::LootItem(LootStoreItem const& li)
 
     needs_quest = li.needs_quest;
 
-    itemid = Item::RollLegacy(itemid, 5.0f);
+    itemid = Item::RollLegacy(itemid, 0.5f);
     randomSuffix = GenerateEnchSuffixFactor(itemid);
     randomPropertyId = Item::GenerateItemRandomPropertyId(itemid);
     count = 0;

@@ -67,6 +67,7 @@
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "SpellMgr.h"
+#include "SpellHistory.h"
 #include "Transport.h"
 #include "UpdateData.h"
 #include "UpdateFieldFlags.h"
@@ -843,6 +844,8 @@ Player::Player(WorldSession* session): Unit(true)
         m_baseRatingValue[i] = 0;
 
     m_baseSpellPower = 0;
+    m_baseSpellDamage = 0;
+    m_baseSpellHealing = 0;
     m_baseFeralAP = 0;
     m_baseManaRegen = 0;
     m_baseHealthRegen = 0;
@@ -925,6 +928,10 @@ Player::Player(WorldSession* session): Unit(true)
     m_PrimaryStat = 0;
     m_SecondaryStat = 0;
     m_WarSchool = 0;
+    m_UpgradingSpell = 0;
+    m_CanLearnTalent = false;
+    m_PreferedTalentCategory = -1;
+    m_LastSelectTarget = ObjectGuid::Empty;
 }
 
 Player::~Player()
@@ -1168,8 +1175,14 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
 
     // original spells
     LearnDefaultSkills();
+    AddSpellsForLevel();
     LearnCustomSpells();
     LearnCapitalCitySpells();
+    InitSpellUpgradeInfoForLevel();
+    m_UpgradingSpell = RollNextSpell();
+    m_CanLearnTalent = true;
+    m_PreferedTalentCategory = -1;
+    m_LastSelectTarget = ObjectGuid::Empty;
 
     // original action bar
     for (PlayerCreateInfoActions::const_iterator action_itr = info->action.begin(); action_itr != info->action.end(); ++action_itr)
@@ -1251,8 +1264,8 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     // all item positions resolved
 
     // add starter quest
-    if (Quest const* quest = sObjectMgr->GetQuestTemplate(26036))
-        AddQuestAndCheckCompletion(quest, NULL);
+    //if (Quest const* quest = sObjectMgr->GetQuestTemplate(LEGACY_START_QUEST))
+    //    AddQuestAndCheckCompletion(quest, NULL);
 
     return true;
 }
@@ -2616,8 +2629,8 @@ void Player::Regenerate(Powers power)
         }   break;
         case POWER_ENERGY:                                  // Regenerate energy (rogue)
             addvalue += 0.01f * m_regenTimer * sWorld->getRate(RATE_POWER_ENERGY);
-            if (HasSkill(SKILL_SPEC_TIER1_10))
-                addvalue *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
+            if (HasSpell(SPEC_SPELL_TIER1_10))
+                addvalue *= 1.1f;
             break;
         case POWER_RUNIC_POWER:
         {
@@ -3084,19 +3097,33 @@ void Player::GiveXP(uint32 xp, Unit* victim, float group_rate)
 
     SendLogXPGain(xp, victim, bonus_xp, recruitAFriend, group_rate);
 
+    if (!GetUInt32Value(PLAYER_NEXT_LEVEL_XP))
+    {
+        if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        {
+            if (!m_UpgradingSpell)
+                m_UpgradingSpell = RollNextSpell();
+            if (const LearnableSpell* spell = xLegacyMgr->GetLearnableSpellData(getClass(), m_UpgradingSpell))
+                SetUInt32Value(PLAYER_NEXT_LEVEL_XP, spell->xp);
+        }
+        else
+            SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
+    }
+
     uint32 curXP = GetUInt32Value(PLAYER_XP);
-    uint32 nextLvlXP = GetUInt32Value(PLAYER_NEXT_LEVEL_XP);
+    uint32 maxXP = GetUInt32Value(PLAYER_NEXT_LEVEL_XP);
     uint32 newXP = curXP + xp + bonus_xp;
 
-    while (newXP >= nextLvlXP && level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+    while (newXP >= maxXP)
     {
-        newXP -= nextLvlXP;
+        newXP -= maxXP;
+        if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            LearnNewSpell();
+            
+        else
+            ConsumeXP();
 
-        if (level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
-            GiveLevel(level + 1);
-
-        level = getLevel();
-        nextLvlXP = GetUInt32Value(PLAYER_NEXT_LEVEL_XP);
+        maxXP = GetUInt32Value(PLAYER_NEXT_LEVEL_XP);
     }
 
     SetUInt32Value(PLAYER_XP, newXP);
@@ -3110,10 +3137,16 @@ void Player::GiveLevel(uint8 level)
     if (level == oldLevel)
         return;
 
-    if (GetQuestStatus(26036) == QUEST_STATUS_INCOMPLETE)
+    if (level == sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)) // no more spells
+    {
+        LearnDefaultSkills();
+        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
+    }
+
+    if (GetQuestStatus(LEGACY_START_QUEST) == QUEST_STATUS_INCOMPLETE)
     {
         AddAura(81466, this);
-        CompleteQuest(26036);
+        CompleteQuest(LEGACY_START_QUEST);
     }
 
     if (Guild* guild = GetGuild())
@@ -3142,11 +3175,6 @@ void Player::GiveLevel(uint8 level)
         data << uint32(int32(info.stats[i]) - GetCreateStat(Stats(i)));
 
     GetSession()->SendPacket(&data);
-
-    if (level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL_LEGACY))
-        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForLevel(level));
-    else
-        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
 
     //update level, max level of skills
     m_Played_time[PLAYED_TIME_LEVEL] = 0;                   // Level Played Time reset
@@ -3214,40 +3242,8 @@ void Player::GiveLevel(uint8 level)
 
 void Player::InitTalentForLevel()
 {
-    uint8 level = getLevel();
-    // talents base at level diff (talents = level - 9 but some can be used already)
-    if (level < 10)
-    {
-        // Remove all talent points
-        if (m_usedTalentCount > 0)                           // Free any used talents
-        {
-            ResetTalents(true); /// @todo: Has to (collectively) be renamed to ResetTalents
-            SetFreeTalentPoints(0);
-        }
-    }
-    else
-    {
-        if (level < sWorld->getIntConfig(CONFIG_MIN_DUALSPEC_LEVEL) || m_specsCount == 0)
-        {
-            m_specsCount = 1;
-            m_activeSpec = 0;
-        }
-
-        uint32 talentPointsForLevel = CalculateTalentsPoints();
-
-        // if used more that have then reset
-        if (m_usedTalentCount > talentPointsForLevel)
-        {
-            if (!GetSession()->HasPermission(rbac::RBAC_PERM_SKIP_CHECK_MORE_TALENTS_THAN_ALLOWED))
-                ResetTalents(true);
-            else
-                SetFreeTalentPoints(0);
-        }
-        // else update amount of free points
-        else
-            SetFreeTalentPoints(talentPointsForLevel - m_usedTalentCount);
-    }
-
+    uint32 talentPointsForLevel = CalculateTalentsPoints();
+    SetFreeTalentPoints(talentPointsForLevel - m_usedTalentCount);
     if (!GetSession()->PlayerLoading())
         SendTalentsInfoData(false);                         // update at client
 }
@@ -3265,10 +3261,10 @@ void Player::InitStatsForLevel(bool reapplyMods)
 
     SetUInt32Value(PLAYER_FIELD_MAX_LEVEL, sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL));
 
-    if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL_LEGACY))
-        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForLevel(getLevel()));
-    else
-        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
+    //if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL_LEGACY))
+    //    SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForLevel(getLevel()));
+    //else
+    //    SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
 
     // reset before any aura state sources (health set/aura apply)
     SetUInt32Value(UNIT_FIELD_AURASTATE, 0);
@@ -3419,12 +3415,10 @@ void Player::InitStatsForLevel(bool reapplyMods)
 
 void Player::SendInitialSpells()
 {
-    time_t curTime = time(NULL);
-    time_t infTime = curTime + infinityCooldownDelayCheck;
-
+    uint16 spellCooldowns = GetSpellHistory()->GetCooldownsSizeForPacket();
     uint16 spellCount = 0;
 
-    WorldPacket data(SMSG_INITIAL_SPELLS, (1+2+4*m_spells.size()+2+m_spellCooldowns.size()*(2+2+2+4+4)));
+    WorldPacket data(SMSG_INITIAL_SPELLS, (1 + 2 + 4 * m_spells.size() + 2 + spellCooldowns * (2 + 2 + 2 + 4 + 4)));
     data << uint8(0);
 
     size_t countPos = data.wpos();
@@ -3446,40 +3440,7 @@ void Player::SendInitialSpells()
 
     data.put<uint16>(countPos, spellCount);                  // write real count value
 
-    uint16 spellCooldowns = m_spellCooldowns.size();
-    data << uint16(spellCooldowns);
-    for (SpellCooldowns::const_iterator itr = m_spellCooldowns.begin(); itr != m_spellCooldowns.end(); ++itr)
-    {
-        SpellInfo const* sEntry = sSpellMgr->GetSpellInfo(itr->first);
-        if (!sEntry)
-            continue;
-
-        data << uint32(itr->first);
-
-        data << uint16(itr->second.itemid);                 // cast item id
-        data << uint16(sEntry->GetCategory());              // spell category
-
-        // send infinity cooldown in special format
-        if (itr->second.end >= infTime)
-        {
-            data << uint32(1);                              // cooldown
-            data << uint32(0x80000000);                     // category cooldown
-            continue;
-        }
-
-        time_t cooldown = itr->second.end > curTime ? (itr->second.end-curTime)*IN_MILLISECONDS : 0;
-
-        if (sEntry->GetCategory())                          // may be wrong, but anyway better than nothing...
-        {
-            data << uint32(0);                              // cooldown
-            data << uint32(cooldown);                       // category cooldown
-        }
-        else
-        {
-            data << uint32(cooldown);                       // cooldown
-            data << uint32(0);                              // category cooldown
-        }
-    }
+    GetSpellHistory()->WritePacket<Player>(data);
 
     GetSession()->SendPacket(&data);
 
@@ -3665,6 +3626,34 @@ bool Player::AddSpell(uint32 spellId, bool active, bool learning, bool dependent
             TC_LOG_ERROR("spells", "Player::addSpell: Broken spell #%u learning not allowed.", spellId);
 
         return false;
+    }
+
+    // remove spec spells
+    bool specSpell = false;
+    switch (spellId)
+    {
+        case TS_ROGUE_ASSASSINATION:
+        case TS_ROGUE_COMBAT:
+        case TS_ROGUE_GENERAL:
+        case TS_ROGUE_SUBTITY:
+            RemoveSpell(TS_ROGUE_ASSASSINATION);
+            RemoveSpell(TS_ROGUE_COMBAT);
+            RemoveSpell(TS_ROGUE_SUBTITY);
+            RemoveSpell(TS_ROGUE_GENERAL);
+            specSpell = true;
+            break;
+        case TS_SHAMAN_GENERAL:
+        case TS_SHAMAN_ELEMENTAL:
+        case TS_SHAMAN_ENHANCEMENT:
+        case TS_SHAMAN_RESTORATION:
+            RemoveSpell(TS_SHAMAN_GENERAL);
+            RemoveSpell(TS_SHAMAN_ELEMENTAL);
+            RemoveSpell(TS_SHAMAN_ENHANCEMENT);
+            RemoveSpell(TS_SHAMAN_RESTORATION);
+            specSpell = true;
+            break;
+        default:
+            break;
     }
 
     PlayerSpellState state = learning ? PLAYERSPELL_NEW : PLAYERSPELL_UNCHANGED;
@@ -3956,6 +3945,9 @@ bool Player::AddSpell(uint32 spellId, bool active, bool learning, bool dependent
         }
 
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_LEARN_SPELL, spellId);
+
+        if (specSpell)
+        UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_KILL_CREATURE, 43304, 1);
     }
 
     // return true (for send learn packet) only if spell active (in case ranked spells) and not replace old spell
@@ -4276,154 +4268,19 @@ bool Player::Has310Flyer(bool checkAllSpells, uint32 excludeSpellId)
     return false;
 }
 
-void Player::RemoveSpellCooldown(uint32 spell_id, bool update /* = false */)
-{
-    m_spellCooldowns.erase(spell_id);
-
-    if (update)
-        SendClearCooldown(spell_id, this);
-}
-
-// I am not sure which one is more efficient
-void Player::RemoveCategoryCooldown(uint32 cat)
-{
-    SpellCategoryStore::const_iterator i_scstore = sSpellsByCategoryStore.find(cat);
-    if (i_scstore != sSpellsByCategoryStore.end())
-        for (SpellCategorySet::const_iterator i_scset = i_scstore->second.begin(); i_scset != i_scstore->second.end(); ++i_scset)
-            RemoveSpellCooldown(*i_scset, true);
-}
-
-void Player::RemoveSpellCategoryCooldown(uint32 cat, bool update /* = false */)
-{
-    SpellCategoryStore::const_iterator ct = sSpellsByCategoryStore.find(cat);
-    if (ct == sSpellsByCategoryStore.end())
-        return;
-
-    const SpellCategorySet& ct_set = ct->second;
-    for (SpellCooldowns::const_iterator i = m_spellCooldowns.begin(); i != m_spellCooldowns.end();)
-    {
-        if (ct_set.find(i->first) != ct_set.end())
-            RemoveSpellCooldown((i++)->first, update);
-        else
-            ++i;
-    }
-}
-
 void Player::RemoveArenaSpellCooldowns(bool removeActivePetCooldowns)
 {
     // remove cooldowns on spells that have < 10 min CD
-
-    SpellCooldowns::iterator itr, next;
-    for (itr = m_spellCooldowns.begin(); itr != m_spellCooldowns.end(); itr = next)
+    GetSpellHistory()->ResetCooldowns([](SpellHistory::CooldownStorageType::iterator itr) -> bool
     {
-        next = itr;
-        ++next;
-        SpellInfo const* entry = sSpellMgr->GetSpellInfo(itr->first);
-        // check if spellentry is present and if the cooldown is less than 10 min
-        if (entry &&
-            entry->RecoveryTime < 10 * MINUTE * IN_MILLISECONDS &&
-            entry->CategoryRecoveryTime < 10 * MINUTE * IN_MILLISECONDS)
-        {
-            // remove & notify
-            RemoveSpellCooldown(itr->first, true);
-        }
-    }
+        SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first);
+        return spellInfo->RecoveryTime < 10 * MINUTE * IN_MILLISECONDS && spellInfo->CategoryRecoveryTime < 10 * MINUTE * IN_MILLISECONDS;
+    }, true);
 
     // pet cooldowns
     if (removeActivePetCooldowns)
         if (Pet* pet = GetPet())
-        {
-            // notify player
-            for (CreatureSpellCooldowns::const_iterator itr2 = pet->m_CreatureSpellCooldowns.begin(); itr2 != pet->m_CreatureSpellCooldowns.end(); ++itr2)
-                SendClearCooldown(itr2->first, pet);
-
-            // actually clear cooldowns
-            pet->m_CreatureSpellCooldowns.clear();
-        }
-}
-
-void Player::RemoveAllSpellCooldown()
-{
-    if (!m_spellCooldowns.empty())
-    {
-        for (SpellCooldowns::const_iterator itr = m_spellCooldowns.begin(); itr != m_spellCooldowns.end(); ++itr)
-            SendClearCooldown(itr->first, this);
-
-        m_spellCooldowns.clear();
-    }
-}
-
-void Player::_LoadSpellCooldowns(PreparedQueryResult result)
-{
-    // some cooldowns can be already set at aura loading...
-
-    //QueryResult* result = CharacterDatabase.PQuery("SELECT spell, item, time FROM character_spell_cooldown WHERE guid = '%u'", GetGUIDLow());
-
-    if (result)
-    {
-        time_t curTime = time(NULL);
-
-        do
-        {
-            Field* fields = result->Fetch();
-            uint32 spell_id = fields[0].GetUInt32();
-            uint32 item_id  = fields[1].GetUInt32();
-            time_t db_time  = time_t(fields[2].GetUInt32());
-
-            if (!sSpellMgr->GetSpellInfo(spell_id))
-            {
-                TC_LOG_ERROR("entities.player.loading", "Player %u has unknown spell %u in `character_spell_cooldown`, skipping.", GetGUIDLow(), spell_id);
-                continue;
-            }
-
-            // skip outdated cooldown
-            if (db_time <= curTime)
-                continue;
-
-            AddSpellCooldown(spell_id, item_id, db_time);
-
-            TC_LOG_DEBUG("entities.player.loading", "Player (GUID: %u) spell %u, item %u cooldown loaded (%u secs).", GetGUIDLow(), spell_id, item_id, uint32(db_time-curTime));
-        }
-        while (result->NextRow());
-    }
-}
-
-void Player::_SaveSpellCooldowns(SQLTransaction& trans)
-{
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_SPELL_COOLDOWN);
-    stmt->setUInt32(0, GetGUIDLow());
-    trans->Append(stmt);
-
-    time_t curTime = time(NULL);
-    time_t infTime = curTime + infinityCooldownDelayCheck;
-
-    bool first_round = true;
-    std::ostringstream ss;
-
-    // remove outdated and save active
-    for (SpellCooldowns::iterator itr = m_spellCooldowns.begin(); itr != m_spellCooldowns.end();)
-    {
-        if (itr->second.end <= curTime)
-            m_spellCooldowns.erase(itr++);
-        else if (itr->second.end <= infTime)                 // not save locked cooldowns, it will be reset or set at reload
-        {
-            if (first_round)
-            {
-                ss << "INSERT INTO character_spell_cooldown (guid, spell, item, time) VALUES ";
-                first_round = false;
-            }
-            // next new/changed record prefix
-            else
-                ss << ',';
-            ss << '(' << GetGUIDLow() << ',' << itr->first << ',' << itr->second.itemid << ',' << uint64(itr->second.end) << ')';
-            ++itr;
-        }
-        else
-            ++itr;
-    }
-    // if something changed execute
-    if (!first_round)
-        trans->Append(ss.str().c_str());
+            pet->GetSpellHistory()->ResetAllCooldowns();
 }
 
 uint32 Player::ResetTalentsCost() const
@@ -4971,7 +4828,7 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
-            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_SPELL_COOLDOWN);
+            stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_SPELL_COOLDOWNS);
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
 
@@ -5844,6 +5701,9 @@ uint32 Player::GetShieldBlockValue() const
 
 float Player::GetMeleeCritFromAgility()
 {
+    return 0.0f;
+
+    /*
     uint8 level = getLevel();
     uint32 pclass = getClass();
 
@@ -5857,10 +5717,12 @@ float Player::GetMeleeCritFromAgility()
 
     float crit = critBase->base + GetStat(STAT_AGILITY)*critRatio->ratio;
     return crit*100.0f;
+    */
 }
 
 void Player::GetDodgeFromAgility(float &diminishing, float &nondiminishing)
 {
+    /*
     // Table for base dodge values
     const float dodge_base[MAX_CLASSES] =
     {
@@ -5910,10 +5772,14 @@ void Player::GetDodgeFromAgility(float &diminishing, float &nondiminishing)
     // calculate diminishing (green in char screen) and non-diminishing (white) contribution
     diminishing = 100.0f * bonus_agility * dodgeRatio->ratio * crit_to_dodge[pclass-1];
     nondiminishing = 100.0f * (dodge_base[pclass-1] + base_agility * dodgeRatio->ratio * crit_to_dodge[pclass-1]);
+    */
 }
 
 float Player::GetSpellCritFromIntellect()
 {
+    return 0.0f;
+
+    /*
     uint8 level = getLevel();
     uint32 pclass = getClass();
 
@@ -5927,6 +5793,7 @@ float Player::GetSpellCritFromIntellect()
 
     float crit=critBase->base + GetStat(STAT_INTELLECT)*critRatio->ratio;
     return crit*100.0f;
+    */
 }
 
 float Player::GetRatingMultiplier(CombatRating cr) const
@@ -6427,14 +6294,13 @@ void Player::ModifySkillBonus(uint32 skillid, int32 val, bool talent)
 
 void Player::UpdateSkillsForLevel()
 {
-    uint16 maxconfskill = sWorld->GetConfigMaxSkillValue();
-    uint32 maxSkill = GetMaxSkillValueForLevel();
-    uint32 maxAttriSkill = GetMaxAttriSkillValueForLevel();
-
     bool alwaysMaxSkill = sWorld->getBoolConfig(CONFIG_ALWAYS_MAX_SKILL_FOR_LEVEL);
 
     for (SkillStatusMap::iterator itr = mSkillStatus.begin(); itr != mSkillStatus.end(); ++itr)
     {
+        uint16 maxconfskill = sWorld->GetConfigMaxSkillValue();
+        uint32 maxSkill = GetMaxSkillValueForLevel();
+
         if (itr->second.uState == SKILL_DELETED)
             continue;
 
@@ -6450,11 +6316,34 @@ void Player::UpdateSkillsForLevel()
         if (GetSkillRangeType(rcEntry) != SKILL_RANGE_LEVEL)
             continue;
         
-        bool isAttriSkill = skillEntry->categoryId == SKILL_CATEGORY_ATTRIBUTES;
         uint32 valueIndex = PLAYER_SKILL_VALUE_INDEX(itr->second.pos);
         uint32 data = GetUInt32Value(valueIndex);
         uint32 max = SKILL_MAX(data);
         uint32 val = SKILL_VALUE(data);
+
+        if (skillEntry->categoryId == SKILL_CATEGORY_ATTRIBUTES)
+        {
+            switch (skillEntry->id)
+            {
+                case SKILL_STAT_STRENGTH:
+                    maxSkill = 3 + m_SupremacyStats[STAT_STRENGTH];
+                    break;
+                case SKILL_STAT_AGILITY:
+                    maxSkill = 3 + m_SupremacyStats[STAT_AGILITY];
+                    break;
+                case SKILL_STAT_STAMINA:
+                    maxSkill = 3 + m_SupremacyStats[STAT_STAMINA];
+                    break;
+                case SKILL_STAT_INTELLECT:
+                    maxSkill = 3 + m_SupremacyStats[STAT_INTELLECT];
+                    break;
+                case SKILL_STAT_SPIRIT:
+                    maxSkill = 3 + m_SupremacyStats[STAT_SPIRIT];
+                    break;
+                default:
+                    break;
+            }
+        }
 
         /// update only level dependent max skill values
         if (max != 1)
@@ -6462,13 +6351,13 @@ void Player::UpdateSkillsForLevel()
             /// maximize skill always
             if (alwaysMaxSkill)
             {
-                SetUInt32Value(valueIndex, MAKE_SKILL_VALUE(isAttriSkill ? maxAttriSkill : maxSkill, isAttriSkill ? maxAttriSkill : maxSkill));
+                SetUInt32Value(valueIndex, MAKE_SKILL_VALUE(maxSkill, maxSkill));
                 if (itr->second.uState != SKILL_NEW)
                     itr->second.uState = SKILL_CHANGED;
             }
             else if (max != maxconfskill)                    /// update max skill value if current max skill not maximized
             {
-                SetUInt32Value(valueIndex, MAKE_SKILL_VALUE(val, isAttriSkill ? maxAttriSkill : maxSkill));
+                SetUInt32Value(valueIndex, MAKE_SKILL_VALUE(val, maxSkill));
                 if (itr->second.uState != SKILL_NEW)
                     itr->second.uState = SKILL_CHANGED;
             }
@@ -6484,7 +6373,7 @@ void Player::UpdateSkillsToMaxSkillsForLevel()
             continue;
 
         uint32 pskill = itr->first;
-        if (IsProfessionOrRidingSkill(pskill))
+        if (IsProfessionOrRidingSkill(pskill) || pskill > 788)
             continue;
         uint32 valueIndex = PLAYER_SKILL_VALUE_INDEX(itr->second.pos);
         uint32 data = GetUInt32Value(valueIndex);
@@ -6615,6 +6504,7 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                 // Learn all spells for skill
                 LearnSkillRewardedSpells(id, newVal);
 
+                /*
                 if (const SpecSkillData* data = sObjectMgr->GetSpecSkillData(id))
                 {
                     for (uint8 k = 0; k != 4; ++k)
@@ -6628,30 +6518,10 @@ void Player::SetSkill(uint16 id, uint16 step, uint16 newVal, uint16 maxVal)
                         }
                     }
                 }
+                */
                 return;
             }
         }
-    }
-
-    // update related stats.
-    switch (id)
-    {
-        case SKILL_SPEC_TIER2_1:
-            UpdateSpeed(MOVE_RUN, true);
-            break;
-        case SKILL_SPEC_TIER1_5:
-            UpdateAllCritPercentages();
-            break;
-        case SKILL_SPEC_TIER2_2:
-            //@todo: update attack/cast speed unit fields
-            _RemoveAllStatBonuses();
-            _ApplyAllStatBonuses();
-            break;
-        case SKILL_SPEC_TIER4_2:
-            UpdateArmor();
-            break;
-        default:
-            break;
     }
 }
 
@@ -8524,7 +8394,7 @@ void Player::CastItemCombatSpell(Unit* target, WeaponAttackType attType, uint32 
     if (procVictim & PROC_FLAG_TAKEN_DAMAGE)
     //if (damageInfo->procVictim & PROC_FLAG_TAKEN_ANY_DAMAGE)
     {
-        for (uint8 i = 0; i < MAX_ITEM_SPELLS; ++i)
+        for (uint8 i = 0; i < MAX_ITEM_PROTO_SPELLS; ++i)
         {
             _Spell const& spellData = proto->Spells[i];
 
@@ -12357,6 +12227,9 @@ Item* Player::StoreNewItem(ItemPosCountVec const& dest, uint32 item, bool update
         ItemAddedQuestCheck(item, count);
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_RECEIVE_EPIC_ITEM, item, count);
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_OWN_ITEM, item, 1);
+        if (pItem->IsLegacy())
+            CompleteAchievement(4860);
+
         if (randomPropertyId)
             pItem->SetItemRandomProperties(randomPropertyId);
         pItem = StoreItem(dest, pItem, update);
@@ -12567,10 +12440,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
                 {
                     m_weaponChangeTimer = spellProto->StartRecoveryTime;
 
-                    GetGlobalCooldownMgr().AddGlobalCooldown(spellProto, m_weaponChangeTimer);
-
+                    GetSpellHistory()->AddGlobalCooldown(spellProto, m_weaponChangeTimer);
                     WorldPacket data;
-                    BuildCooldownPacket(data, SPELL_COOLDOWN_FLAG_INCLUDE_GCD, cooldownSpell, 0);
+                    GetSpellHistory()->BuildCooldownPacket(data, SPELL_COOLDOWN_FLAG_INCLUDE_GCD, cooldownSpell, 0);
                     GetSession()->SendPacket(&data);
                 }
             }
@@ -15672,10 +15544,11 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         SetSeasonalQuestStatus(quest_id);
     else if (!quest->IsRepeatable())
     {
-        if (GetQuestStatus(26081) == QUEST_STATUS_INCOMPLETE)
-            AddItem(57372, 1);
-        else if (GetQuestStatus(26081) == QUEST_STATUS_REWARDED)
-            AddItem(57427, 1);
+        //if (GetQuestStatus(26081) == QUEST_STATUS_INCOMPLETE)
+        //    AddItem(57372, 1);
+        //else if (GetQuestStatus(26081) == QUEST_STATUS_REWARDED)
+        //    AddItem(57427, 1);
+        AddItem(57427, 1);
     }
 
     RemoveActiveQuest(quest_id, false);
@@ -17572,6 +17445,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     _LoadCollectedMemory(guid);
 
     SetUInt32Value(UNIT_FIELD_LEVEL, fields[6].GetUInt8());
+
     SetUInt32Value(PLAYER_XP, fields[7].GetUInt32());
 
     _LoadIntoDataField(fields[61].GetCString(), PLAYER_EXPLORED_ZONES_1, PLAYER_EXPLORED_ZONES_SIZE);
@@ -18040,12 +17914,44 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
         TC_LOG_ERROR("entities.player", "Player %s(GUID: %u) has SpecCount = %u and ActiveSpec = %u.", GetName().c_str(), GetGUIDLow(), m_specsCount, m_activeSpec);
     }
 
+    // load non character specified spells
+    LearnDefaultSkills();
+    AddSpellsForLevel();
+    AddGuildSpells();
+    InitSpellUpgradeInfoForLevel();
+    _LoadLearnedSpells(guid);
+    m_UpgradingSpell = fields[71].GetUInt32();
+    if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+    {
+        if (!m_UpgradingSpell || !xLegacyMgr->GetLearnableSpellData(getClass(), m_UpgradingSpell) || !GetUInt32Value(PLAYER_NEXT_LEVEL_XP))
+            m_UpgradingSpell = RollNextSpell();
+        if (!m_UpgradingSpell) // already learned all spells of this level
+        {
+            GiveLevel(getLevel() + 1);
+            if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+                m_UpgradingSpell = RollNextSpell();
+        }
+
+        if (const LearnableSpell* spell = xLegacyMgr->GetLearnableSpellData(getClass(), m_UpgradingSpell))
+            SetUInt32Value(PLAYER_NEXT_LEVEL_XP, spell->xp);
+    }
+    else
+        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr->GetXPForSupremacyLevel(m_SupremacyLevel));
+    _LoadLearnedTalents(guid);
+    LearnCustomSpells();
+    LearnCapitalCitySpells();
+
+    m_CanLearnTalent = fields[72].GetBool();
+    m_PreferedTalentCategory = fields[73].GetInt32();
+
+    // load character specified spells and auras
     _LoadTalents(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_TALENTS));
     _LoadSpells(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_SPELLS));
 
     _LoadGlyphs(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_GLYPHS));
     _LoadAuras(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_AURAS), time_diff);
     _LoadGlyphAuras();
+
     // add ghost flag (must be after aura load: PLAYER_FLAGS_GHOST set in aura)
     if (HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
         m_deathState = DEAD;
@@ -18059,11 +17965,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     _LoadMonthlyQuestStatus(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_MONTHLY_QUEST_STATUS));
     _LoadRandomBGStatus(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_RANDOM_BG));
 
-    // after spell and quest load
     InitTalentForLevel();
-    LearnDefaultSkills();
-    LearnCustomSpells();
-    LearnCapitalCitySpells();
 
     // must be before inventory (some items required reputation check)
     m_reputationMgr->LoadFromDB(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_REPUTATION));
@@ -18091,7 +17993,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SQLQueryHolder *holder)
     // has to be called after last Relocate() in Player::LoadFromDB
     SetFallInformation(0, GetPositionZ());
 
-    _LoadSpellCooldowns(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_SPELL_COOLDOWNS));
+    GetSpellHistory()->LoadFromDB<Player>(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_SPELL_COOLDOWNS));
 
     // Spell code allow apply any auras to dead character in load time in aura/spell/item loading
     // Do now before stats re-calculation cleanup for ghost state unexpected auras
@@ -19355,6 +19257,18 @@ bool Player::Satisfy(AccessRequirement const* ar, uint32 target_map, bool report
 {
     if (!IsGameMaster() && ar)
     {
+        if (GetAverageItemLevel() < ar->item_level)
+            return false;
+
+        if (Group* group = GetGroup())
+        {
+            if (Player* player = sObjectAccessor->FindPlayer(group->GetLeaderGUID()))
+            {
+                if (this != player)
+                    return player->Satisfy(ar, target_map, false);
+            }
+        }
+
         uint8 LevelMin = 0;
         uint8 LevelMax = 0;
 
@@ -19655,6 +19569,9 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setString(index++, ss.str());
         stmt->setUInt8(index++, GetByteValue(PLAYER_FIELD_BYTES, 2));
         stmt->setUInt32(index++, m_grantableLevels);
+        stmt->setUInt32(index++, m_UpgradingSpell);
+        stmt->setBool(index++, m_CanLearnTalent);
+        stmt->setInt32(index++, m_PreferedTalentCategory);
     }
     else
     {
@@ -19781,6 +19698,9 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setUInt32(index++, m_SupremacyLevel);
         stmt->setUInt8(index++, m_PrimaryStat);
         stmt->setUInt8(index++, m_SecondaryStat);
+        stmt->setUInt32(index++, m_UpgradingSpell);
+        stmt->setBool(index++, m_CanLearnTalent);
+        stmt->setInt32(index++, m_PreferedTalentCategory);
         // Index
         stmt->setUInt32(index++, GetGUIDLow());
     }
@@ -19801,7 +19721,7 @@ void Player::SaveToDB(bool create /*=false*/)
     _SaveMonthlyQuestStatus(trans);
     _SaveTalents(trans);
     _SaveSpells(trans);
-    _SaveSpellCooldowns(trans);
+    GetSpellHistory()->SaveToDB<Player>(trans);
     _SaveActions(trans);
     _SaveAuras(trans);
     _SaveSkills(trans);
@@ -19812,6 +19732,7 @@ void Player::SaveToDB(bool create /*=false*/)
     _SaveGlyphs(trans);
     _SaveInstanceTimeRestrictions(trans);
     _SaveSupremacyStats(trans);
+    _SaveLearnedSpells(trans);
 
     // check if stats should only be saved on logout
     // save stats can be out of transaction
@@ -21039,41 +20960,8 @@ void Player::PetSpellInitialize()
 
     data.put<uint8>(spellsCountPos, addlist);
 
-    uint8 cooldownsCount = pet->m_CreatureSpellCooldowns.size() + pet->m_CreatureCategoryCooldowns.size();
-    data << uint8(cooldownsCount);
-
-    time_t curTime = time(NULL);
-
-    for (CreatureSpellCooldowns::const_iterator itr = pet->m_CreatureSpellCooldowns.begin(); itr != pet->m_CreatureSpellCooldowns.end(); ++itr)
-    {
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itr->first);
-        if (!spellInfo)
-        {
-            data << uint32(0);
-            data << uint16(0);
-            data << uint32(0);
-            data << uint32(0);
-            continue;
-        }
-
-        time_t cooldown = (itr->second > curTime) ? (itr->second - curTime) * IN_MILLISECONDS : 0;
-        data << uint32(itr->first);                 // spell ID
-
-        CreatureSpellCooldowns::const_iterator categoryitr = pet->m_CreatureCategoryCooldowns.find(spellInfo->GetCategory());
-        if (categoryitr != pet->m_CreatureCategoryCooldowns.end())
-        {
-            time_t categoryCooldown = (categoryitr->second > curTime) ? (categoryitr->second - curTime) * IN_MILLISECONDS : 0;
-            data << uint16(spellInfo->GetCategory());   // spell category
-            data << uint32(cooldown);                   // spell cooldown
-            data << uint32(categoryCooldown);           // category cooldown
-        }
-        else
-        {
-            data << uint16(0);
-            data << uint32(cooldown);
-            data << uint32(0);
-        }
-    }
+    //Cooldowns
+    pet->GetSpellHistory()->WritePacket<Pet>(data);
 
     GetSession()->SendPacket(&data);
 }
@@ -21112,7 +21000,7 @@ void Player::VehicleSpellInitialize()
     if (!vehicle)
         return;
 
-    uint8 cooldownCount = vehicle->m_CreatureSpellCooldowns.size();
+    uint8 cooldownCount = vehicle->GetSpellHistory()->GetCooldownsSizeForPacket();
 
     WorldPacket data(SMSG_PET_SPELLS, 8 + 2 + 4 + 4 + 4 * 10 + 1 + 1 + cooldownCount * (4 + 2 + 4 + 4));
     data << uint64(vehicle->GetGUID());                     // Guid
@@ -21153,41 +21041,7 @@ void Player::VehicleSpellInitialize()
     data << uint8(0); // Auras?
 
     // Cooldowns
-    data << uint8(cooldownCount);
-
-    time_t now = sWorld->GetGameTime();
-
-    for (CreatureSpellCooldowns::const_iterator itr = vehicle->m_CreatureSpellCooldowns.begin(); itr != vehicle->m_CreatureSpellCooldowns.end(); ++itr)
-    {
-        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(itr->first);
-        if (!spellInfo)
-        {
-            data << uint32(0);
-            data << uint16(0);
-            data << uint32(0);
-            data << uint32(0);
-            continue;
-        }
-
-        time_t cooldown = (itr->second > now) ? (itr->second - now) * IN_MILLISECONDS : 0;
-        data << uint32(itr->first);                 // spell ID
-
-        CreatureSpellCooldowns::const_iterator categoryitr = vehicle->m_CreatureCategoryCooldowns.find(spellInfo->GetCategory());
-        if (categoryitr != vehicle->m_CreatureCategoryCooldowns.end())
-        {
-            time_t categoryCooldown = (categoryitr->second > now) ? (categoryitr->second - now) * IN_MILLISECONDS : 0;
-            data << uint16(spellInfo->GetCategory());   // spell category
-            data << uint32(cooldown);                   // spell cooldown
-            data << uint32(categoryCooldown);           // category cooldown
-        }
-        else
-        {
-            data << uint16(0);
-            data << uint32(cooldown);
-            data << uint32(0);
-        }
-    }
-
+    vehicle->GetSpellHistory()->WritePacket<Pet>(data);
     GetSession()->SendPacket(&data);
 }
 
@@ -21807,9 +21661,9 @@ void Player::ContinueTaxiFlight()
 
     float distPrev = MAP_SIZE*MAP_SIZE;
     float distNext =
-        (nodeList[0].x-GetPositionX())*(nodeList[0].x-GetPositionX())+
-        (nodeList[0].y-GetPositionY())*(nodeList[0].y-GetPositionY())+
-        (nodeList[0].z-GetPositionZ())*(nodeList[0].z-GetPositionZ());
+        (nodeList[0].LocX-GetPositionX())*(nodeList[0].LocX-GetPositionX())+
+        (nodeList[0].LocY-GetPositionY())*(nodeList[0].LocY-GetPositionY())+
+        (nodeList[0].LocZ-GetPositionZ())*(nodeList[0].LocZ-GetPositionZ());
 
     for (uint32 i = 1; i < nodeList.size(); ++i)
     {
@@ -21817,20 +21671,20 @@ void Player::ContinueTaxiFlight()
         TaxiPathNodeEntry const& prevNode = nodeList[i-1];
 
         // skip nodes at another map
-        if (node.mapid != GetMapId())
+        if (node.MapID != GetMapId())
             continue;
 
         distPrev = distNext;
 
         distNext =
-            (node.x-GetPositionX())*(node.x-GetPositionX())+
-            (node.y-GetPositionY())*(node.y-GetPositionY())+
-            (node.z-GetPositionZ())*(node.z-GetPositionZ());
+            (node.LocX-GetPositionX())*(node.LocX-GetPositionX())+
+            (node.LocY-GetPositionY())*(node.LocY-GetPositionY())+
+            (node.LocZ-GetPositionZ())*(node.LocZ-GetPositionZ());
 
         float distNodes =
-            (node.x-prevNode.x)*(node.x-prevNode.x)+
-            (node.y-prevNode.y)*(node.y-prevNode.y)+
-            (node.z-prevNode.z)*(node.z-prevNode.z);
+            (node.LocX-prevNode.LocX)*(node.LocX-prevNode.LocX)+
+            (node.LocY-prevNode.LocY)*(node.LocY-prevNode.LocY)+
+            (node.LocZ-prevNode.LocZ)*(node.LocZ-prevNode.LocZ);
 
         if (distNext + distPrev < distNodes)
         {
@@ -21840,39 +21694,6 @@ void Player::ContinueTaxiFlight()
     }
 
     GetSession()->SendDoFlight(mountDisplayId, path, startNode);
-}
-
-void Player::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs)
-{
-    PacketCooldowns cooldowns;
-    WorldPacket data;
-    time_t curTime = time(NULL);
-    for (PlayerSpellMap::const_iterator itr = m_spells.begin(); itr != m_spells.end(); ++itr)
-    {
-        if (itr->second->state == PLAYERSPELL_REMOVED)
-            continue;
-        uint32 unSpellId = itr->first;
-        SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(unSpellId);
-
-        // Not send cooldown for this spells
-        if (spellInfo->IsCooldownStartedOnEvent())
-            continue;
-
-        if (spellInfo->PreventionType != SPELL_PREVENTION_TYPE_SILENCE)
-            continue;
-
-        if ((idSchoolMask & spellInfo->GetSchoolMask()) && GetSpellCooldownDelay(unSpellId) < unTimeMs)
-        {
-            cooldowns[unSpellId] = unTimeMs;
-            AddSpellCooldown(unSpellId, 0, curTime + unTimeMs/IN_MILLISECONDS);
-        }
-    }
-
-    if (!cooldowns.empty())
-    {
-        BuildCooldownPacket(data, SPELL_COOLDOWN_FLAG_NONE, cooldowns);
-        GetSession()->SendPacket(&data);
-    }
 }
 
 void Player::InitDataForForm(bool reapplyMods)
@@ -22307,206 +22128,6 @@ void Player::UpdatePvP(bool state, bool _override)
     }
 }
 
-bool Player::HasSpellCooldown(uint32 spell_id) const
-{
-    SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
-    return itr != m_spellCooldowns.end() && itr->second.end > time(NULL);
-}
-
-uint32 Player::GetSpellCooldownDelay(uint32 spell_id) const
-{
-    SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
-    time_t t = time(NULL);
-    return uint32(itr != m_spellCooldowns.end() && itr->second.end > t ? itr->second.end - t : 0);
-}
-
-void Player::AddSpellAndCategoryCooldowns(SpellInfo const* spellInfo, uint32 itemId, Spell* spell, bool infinityCooldown)
-{
-    // init cooldown values
-    uint32 cat   = 0;
-    int32 rec    = -1;
-    int32 catrec = -1;
-
-    // some special item spells without correct cooldown in SpellInfo
-    // cooldown information stored in item prototype
-    // This used in same way in WorldSession::HandleItemQuerySingleOpcode data sending to client.
-
-    if (itemId)
-    {
-        if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId))
-        {
-            for (uint8 idx = 0; idx < MAX_ITEM_SPELLS; ++idx)
-            {
-                if (uint32(proto->Spells[idx].SpellId) == spellInfo->Id)
-                {
-                    cat    = proto->Spells[idx].SpellCategory;
-                    rec    = proto->Spells[idx].SpellCooldown;
-                    catrec = proto->Spells[idx].SpellCategoryCooldown;
-                    break;
-                }
-            }
-        }
-    }
-
-    // if no cooldown found above then base at DBC data
-    if (rec < 0 && catrec < 0)
-    {
-        cat = spellInfo->GetCategory();
-        rec = spellInfo->RecoveryTime;
-        catrec = spellInfo->CategoryRecoveryTime;
-    }
-
-    time_t curTime = time(NULL);
-
-    time_t catrecTime;
-    time_t recTime;
-
-    bool needsCooldownPacket = false;
-
-    // overwrite time for selected category
-    if (infinityCooldown)
-    {
-        // use +MONTH as infinity mark for spell cooldown (will checked as MONTH/2 at save ans skipped)
-        // but not allow ignore until reset or re-login
-        catrecTime = catrec > 0 ? curTime+infinityCooldownDelay : 0;
-        recTime    = rec    > 0 ? curTime+infinityCooldownDelay : catrecTime;
-    }
-    else
-    {
-        // shoot spells used equipped item cooldown values already assigned in GetAttackTime(RANGED_ATTACK)
-        // prevent 0 cooldowns set by another way
-        if (rec <= 0 && catrec <= 0 && (cat == 76 || (spellInfo->IsAutoRepeatRangedSpell() && spellInfo->Id != 75)))
-            rec = GetAttackTime(RANGED_ATTACK);
-
-        // Now we have cooldown data (if found any), time to apply mods
-        if (rec > 0)
-            ApplySpellMod(spellInfo->Id, SPELLMOD_COOLDOWN, rec, spell);
-
-        if (catrec > 0 && !spellInfo->HasAttribute(SPELL_ATTR6_IGNORE_CATEGORY_COOLDOWN_MODS))
-            ApplySpellMod(spellInfo->Id, SPELLMOD_COOLDOWN, catrec, spell);
-
-        if (int32 cooldownMod = GetTotalAuraModifier(SPELL_AURA_MOD_COOLDOWN))
-        {
-            // Apply SPELL_AURA_MOD_COOLDOWN only to own spells
-            if (HasSpell(spellInfo->Id))
-            {
-                needsCooldownPacket = true;
-                rec += cooldownMod * IN_MILLISECONDS;   // SPELL_AURA_MOD_COOLDOWN does not affect category cooldows, verified with shaman shocks
-            }
-        }
-
-        // replace negative cooldowns by 0
-        if (rec < 0) rec = 0;
-        if (catrec < 0) catrec = 0;
-
-        // no cooldown after applying spell mods
-        if (rec == 0 && catrec == 0)
-            return;
-
-        catrecTime = catrec ? curTime+catrec/IN_MILLISECONDS : 0;
-        recTime    = rec ? curTime+rec/IN_MILLISECONDS : catrecTime;
-    }
-
-    // self spell cooldown
-    if (recTime > 0)
-    {
-        AddSpellCooldown(spellInfo->Id, itemId, recTime);
-
-        if (needsCooldownPacket)
-        {
-            WorldPacket data;
-            BuildCooldownPacket(data, SPELL_COOLDOWN_FLAG_NONE, spellInfo->Id, rec);
-            SendDirectMessage(&data);
-        }
-    }
-
-    // category spells
-    if (cat && catrec > 0)
-    {
-        SpellCategoryStore::const_iterator i_scstore = sSpellsByCategoryStore.find(cat);
-        if (i_scstore != sSpellsByCategoryStore.end())
-        {
-            for (SpellCategorySet::const_iterator i_scset = i_scstore->second.begin(); i_scset != i_scstore->second.end(); ++i_scset)
-            {
-                if (*i_scset == spellInfo->Id)                    // skip main spell, already handled above
-                    continue;
-
-                AddSpellCooldown(*i_scset, itemId, catrecTime);
-            }
-        }
-    }
-}
-
-void Player::AddSpellCooldown(uint32 spellid, uint32 itemid, time_t end_time)
-{
-    SpellCooldown sc;
-    sc.end = end_time;
-    sc.itemid = itemid;
-    m_spellCooldowns[spellid] = sc;
-}
-
-void Player::ModifySpellCooldown(uint32 spellId, int32 cooldown)
-{
-    SpellCooldowns::iterator itr = m_spellCooldowns.find(spellId);
-    if (itr == m_spellCooldowns.end())
-        return;
-
-    time_t now = time(NULL);
-    if (itr->second.end + (cooldown / IN_MILLISECONDS) > now)
-        itr->second.end += (cooldown / IN_MILLISECONDS);
-    else
-        m_spellCooldowns.erase(itr);
-
-    WorldPacket data(SMSG_MODIFY_COOLDOWN, 4 + 8 + 4);
-    data << uint32(spellId);            // Spell ID
-    data << uint64(GetGUID());          // Player GUID
-    data << int32(cooldown);            // Cooldown mod in milliseconds
-    GetSession()->SendPacket(&data);
-
-    TC_LOG_DEBUG("misc", "ModifySpellCooldown:: Player: %s (GUID: %u) Spell: %u cooldown: %u", GetName().c_str(), GetGUIDLow(), spellId, GetSpellCooldownDelay(spellId));
-}
-
-void Player::SendCooldownEvent(SpellInfo const* spellInfo, uint32 itemId /*= 0*/, Spell* spell /*= NULL*/, bool setCooldown /*= true*/)
-{
-    // start cooldowns at server side, if any
-    if (setCooldown)
-        AddSpellAndCategoryCooldowns(spellInfo, itemId, spell);
-
-    // Send activate cooldown timer (possible 0) at client side
-    WorldPacket data(SMSG_COOLDOWN_EVENT, 4 + 8);
-    data << uint32(spellInfo->Id);
-    data << uint64(GetGUID());
-    SendDirectMessage(&data);
-
-    uint32 cat = spellInfo->GetCategory();
-    if (cat && spellInfo->CategoryRecoveryTime)
-    {
-        SpellCategoryStore::const_iterator ct = sSpellsByCategoryStore.find(cat);
-        if (ct != sSpellsByCategoryStore.end())
-        {
-            SpellCategorySet const& catSet = ct->second;
-            for (SpellCooldowns::const_iterator i = m_spellCooldowns.begin(); i != m_spellCooldowns.end(); ++i)
-            {
-                if (i->first == spellInfo->Id) // skip main spell, already handled above
-                    continue;
-
-                SpellInfo const* spellInfo2 = sSpellMgr->GetSpellInfo(i->first);
-                if (!spellInfo2 || !spellInfo2->IsCooldownStartedOnEvent())
-                    continue;
-
-                if (catSet.find(i->first) != catSet.end())
-                {
-                    // Send activate cooldown timer (possible 0) at client side
-                    WorldPacket data(SMSG_COOLDOWN_EVENT, 4 + 8);
-                    data << uint32(i->first);
-                    data << uint64(GetGUID());
-                    SendDirectMessage(&data);
-                }
-            }
-        }
-    }
-}
-
 void Player::UpdatePotionCooldown(Spell* spell)
 {
     // no potion used i combat or still in combat
@@ -22518,14 +22139,14 @@ void Player::UpdatePotionCooldown(Spell* spell)
     {
         // spell/item pair let set proper cooldown (except not existed charged spell cooldown spellmods for potions)
         if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(m_lastPotionId))
-            for (uint8 idx = 0; idx < MAX_ITEM_SPELLS; ++idx)
+            for (uint8 idx = 0; idx < MAX_ITEM_PROTO_SPELLS; ++idx)
                 if (proto->Spells[idx].SpellId && proto->Spells[idx].SpellTrigger == ITEM_SPELLTRIGGER_ON_USE)
                     if (SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(proto->Spells[idx].SpellId))
-                        SendCooldownEvent(spellInfo, m_lastPotionId);
+                        GetSpellHistory()->SendCooldownEvent(spellInfo, m_lastPotionId);
     }
     // from spell cases (m_lastPotionId set in Spell::SendSpellCooldown)
     else
-        SendCooldownEvent(spell->m_spellInfo, m_lastPotionId, spell);
+        GetSpellHistory()->SendCooldownEvent(spell->m_spellInfo, m_lastPotionId, spell);
 
     m_lastPotionId = 0;
 }
@@ -23436,14 +23057,13 @@ void Player::ApplyEquipCooldown(Item* pItem)
             continue;
 
         // Don't replace longer cooldowns by equip cooldown if we have any.
-        SpellCooldowns::iterator itr = m_spellCooldowns.find(spellData.SpellId);
-        if (itr != m_spellCooldowns.end() && itr->second.itemid == pItem->GetEntry() && itr->second.end > time(NULL) + 30)
+        if (GetSpellHistory()->GetRemainingCooldown(spellData.SpellId) > 30 * IN_MILLISECONDS)
             continue;
 
-        AddSpellCooldown(spellData.SpellId, pItem->GetEntry(), time(NULL) + 30);
+        GetSpellHistory()->AddCooldown(spellData.SpellId, pItem->GetEntry(), std::chrono::seconds(30));
 
-        WorldPacket data(SMSG_ITEM_COOLDOWN, 12);
-        data << pItem->GetGUID();
+        WorldPacket data(SMSG_ITEM_COOLDOWN, 8 + 4);
+        data << uint64(pItem->GetGUID());
         data << uint32(spellData.SpellId);
         GetSession()->SendPacket(&data);
     }
@@ -23548,6 +23168,9 @@ void Player::LearnDefaultSkill(uint32 skillId, uint16 rank)
     if (!skillInfo)
         return;
 
+    if (getLevel() < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL) && skillInfo->categoryId == SKILL_CATEGORY_ATTRIBUTES)
+        return;
+
     TC_LOG_DEBUG("entities.player.loading", "PLAYER (Class: %u Race: %u): Adding initial skill, id = %u", uint32(getClass()), uint32(getRace()), skillId);
     switch (GetSkillRangeType(rcInfo))
     {
@@ -23557,7 +23180,32 @@ void Player::LearnDefaultSkill(uint32 skillId, uint16 rank)
         case SKILL_RANGE_LEVEL:
         {
             uint16 skillValue = 1;
-            uint16 maxValue = skillInfo->categoryId == SKILL_CATEGORY_ATTRIBUTES ? GetMaxAttriSkillValueForLevel() : GetMaxSkillValueForLevel();
+            uint16 maxValue = GetMaxSkillValueForLevel();
+
+            if (skillInfo->categoryId == SKILL_CATEGORY_ATTRIBUTES)
+            {
+                switch (skillInfo->id)
+                {
+                    case SKILL_STAT_AGILITY:
+                        maxValue = 3 + m_SupremacyStats[STAT_AGILITY];
+                        break;
+                    case SKILL_STAT_INTELLECT:
+                        maxValue = 3 + m_SupremacyStats[STAT_INTELLECT];
+                        break;
+                    case SKILL_STAT_SPIRIT:
+                        maxValue = 3 + m_SupremacyStats[STAT_SPIRIT];
+                        break;
+                    case SKILL_STAT_STAMINA:
+                        maxValue = 3 + m_SupremacyStats[STAT_STAMINA];
+                        break;
+                    case SKILL_STAT_STRENGTH:
+                        maxValue = 3 + m_SupremacyStats[STAT_STRENGTH];
+                        break;
+                    default:
+                        break;
+                }
+            }
+
             if (rcInfo->Flags & SKILL_FLAG_ALWAYS_MAX_VALUE)
                 skillValue = maxValue;
             else if (getClass() == CLASS_DEATH_KNIGHT)
@@ -24327,7 +23975,7 @@ uint32 Player::GetResurrectionSpellId()
     }
 
     // Reincarnation (passive spell)  // prio: 1                  // Glyph of Renewed Life
-    if (prio < 1 && HasSpell(20608) && !HasSpellCooldown(21169) && (HasAura(58059) || HasItemCount(17030)))
+    if (prio < 1 && HasSpell(20608) && !GetSpellHistory()->HasCooldown(21169) && (HasAura(58059) || HasItemCount(17030)))
         spell_id = 21169;
 
     return spell_id;
@@ -25386,17 +25034,11 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
 
 uint32 Player::CalculateTalentsPoints() const
 {
-    uint32 base_talent = getLevel() < 10 ? 0 : getLevel()-9;
-
-    if (getClass() != CLASS_DEATH_KNIGHT || GetMapId() != 609)
-        return uint32(base_talent * sWorld->getRate(RATE_TALENT));
-
-    uint32 talentPointsForLevel = getLevel() < 56 ? 0 : getLevel() - 55;
-    talentPointsForLevel += m_questRewardTalentCount;
-
-    if (talentPointsForLevel > base_talent)
-        talentPointsForLevel = base_talent;
-
+    uint32 talentPointsForLevel = (uint32)(getLevel() / 20) + 1;
+    if (HasAchieved(1285))
+        talentPointsForLevel += 5;
+    if (HasAchieved(1286))
+        talentPointsForLevel += 5;
     return uint32(talentPointsForLevel * sWorld->getRate(RATE_TALENT));
 }
 
@@ -25715,6 +25357,12 @@ void Player::CompletedAchievement(AchievementEntry const* entry)
     m_achievementMgr->CompletedAchievement(entry);
 }
 
+void Player::CompleteAchievement(uint32 entry)
+{
+    if (AchievementEntry const* achievementEntry = sAchievementMgr->GetAchievement(entry))
+        CompletedAchievement(achievementEntry);
+}
+
 void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 {
     uint32 CurTalentPoints = GetFreeTalentPoints();
@@ -25776,37 +25424,64 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
     }
 
     // Find out how many points we have in this field
-    uint32 spentPoints = 0;
+    //uint32 spentPoints = 0;
 
+    //uint32 tTab = talentInfo->TalentTab;
+    //if (talentInfo->Row > 0)
+    //{
+    //    uint32 numRows = sTalentStore.GetNumRows();
+    //    for (uint32 i = 0; i < numRows; i++)          // Loop through all talents.
+    //    {
+    //        // Someday, someone needs to revamp
+    //        const TalentEntry* tmpTalent = sTalentStore.LookupEntry(i);
+    //        if (tmpTalent)                                  // the way talents are tracked
+    //        {
+    //            if (tmpTalent->TalentTab == tTab)
+    //            {
+    //                for (uint8 rank = 0; rank < MAX_TALENT_RANK; rank++)
+    //                {
+    //                    if (tmpTalent->RankID[rank] != 0)
+    //                    {
+    //                        if (HasSpell(tmpTalent->RankID[rank]))
+    //                        {
+    //                            spentPoints += (rank + 1);
+    //                        }
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
+
+    // not have required min points spent in talent tree
+    //if (spentPoints < (talentInfo->Row * MAX_TALENT_RANK))
+    //    return;
+
+    uint8 talentLearned = 0;
     uint32 tTab = talentInfo->TalentTab;
-    if (talentInfo->Row > 0)
+    uint32 tRow = talentInfo->Row;
+    if (getLevel() < tRow * 20)
+        return;
+    for (uint32 i = 0; i != sTalentStore.GetNumRows(); ++i)
     {
-        uint32 numRows = sTalentStore.GetNumRows();
-        for (uint32 i = 0; i < numRows; i++)          // Loop through all talents.
+        const TalentEntry* tmpTalent = sTalentStore.LookupEntry(i);
+        if (tmpTalent)
         {
-            // Someday, someone needs to revamp
-            const TalentEntry* tmpTalent = sTalentStore.LookupEntry(i);
-            if (tmpTalent)                                  // the way talents are tracked
+            if (tmpTalent->TalentTab == tTab && tmpTalent->Row == tRow)
             {
-                if (tmpTalent->TalentTab == tTab)
+                for (uint8 rank = 0; rank < MAX_TALENT_RANK; rank++)
                 {
-                    for (uint8 rank = 0; rank < MAX_TALENT_RANK; rank++)
+                    if (tmpTalent->RankID[rank] != 0)
                     {
-                        if (tmpTalent->RankID[rank] != 0)
-                        {
-                            if (HasSpell(tmpTalent->RankID[rank]))
-                            {
-                                spentPoints += (rank + 1);
-                            }
-                        }
+                        if (HasSpell(tmpTalent->RankID[rank]))
+                            talentLearned++;
                     }
                 }
             }
         }
     }
 
-    // not have required min points spent in talent tree
-    if (spentPoints < (talentInfo->Row * MAX_TALENT_RANK))
+    if (talentLearned > 1)
         return;
 
     // spell not set in talent.dbc
@@ -26403,14 +26078,6 @@ void Player::RemoveAtLoginFlag(AtLoginFlags flags, bool persist /*= false*/)
 
         CharacterDatabase.Execute(stmt);
     }
-}
-
-void Player::SendClearCooldown(uint32 spell_id, Unit* target)
-{
-    WorldPacket data(SMSG_CLEAR_COOLDOWN, 4+8);
-    data << uint32(spell_id);
-    data << uint64(target->GetGUID());
-    SendDirectMessage(&data);
 }
 
 void Player::ResetMap()
@@ -27958,6 +27625,9 @@ void Player::CollectMemory(const CollectableMemory* memory, bool announce /* = t
             std::string name = ItemChatLink::FormatName(memory->rewardItem);
             ChatHandler(GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(52, name.c_str()).c_str());
         }
+
+        if (memory->achievement)
+            CompleteAchievement(memory->achievement);
     }
 
     if (memory->rewardSpell)
@@ -28005,7 +27675,7 @@ bool Player::HasLootCooldown(uint32 item) const
     AccountLootCooldownMap::const_iterator itr = m_AccountLootCooldownMap.find(item);
     if (itr == m_AccountLootCooldownMap.end())
         return false;
-    return itr->second == 0;
+    return itr->second != 0;
 }
 
 void Player::AddLootCooldown(uint32 item)
@@ -28037,6 +27707,344 @@ void Player::UpdateLootCooldown(uint32 diff)
                 itr->second = 0;
         }
     }
+}
+
+bool Player::CanLevelUp() const
+{
+    if (!m_UpgradingSpellListForCurrentLevel.size())
+        return false;
+
+    for (UpgradingSpellMap::const_iterator itr = m_UpgradingSpellListForCurrentLevel.begin(); itr != m_UpgradingSpellListForCurrentLevel.end(); ++itr)
+    {
+        if (!itr->second)
+            return false;
+    }
+
+    return true;
+}
+
+void Player::InitSpellUpgradeInfoForLevel()
+{
+    uint32 level = getLevel();
+    m_UpgradingSpellListForCurrentLevel.clear();
+
+    std::vector<uint32> learnableSpellList = xLegacyMgr->GetLearnableSpellListForLevel(getClass(), level);
+
+    if (learnableSpellList.size() == 0) // max level case
+        return;
+
+    for (uint32 i = 0; i != learnableSpellList.size(); ++i)
+    {
+        if (HasSpell(learnableSpellList[i]))
+            m_UpgradingSpellListForCurrentLevel[learnableSpellList[i]] = true;
+        else
+            m_UpgradingSpellListForCurrentLevel[learnableSpellList[i]] = false;
+    }
+}
+
+void Player::UpgradingNextSpell()
+{
+    uint32 nextSpell = RollNextSpell();
+    const LearnableSpell* spell = xLegacyMgr->GetLearnableSpellData(getClass(), nextSpell);
+    if (spell)
+    {
+        m_UpgradingSpell = nextSpell;
+        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, spell->xp);
+    }
+    else
+    {
+        if (CanLevelUp())
+        {
+            ConsumeXP();
+            return;
+        }
+
+        TC_LOG_ERROR("entities.player", "Upgrading Spell ID: %u Not Found! Player Class: %u, Level: %u", m_UpgradingSpell, getClass(), getLevel());
+        m_UpgradingSpell = 0;
+        SetUInt32Value(PLAYER_NEXT_LEVEL_XP, 999999);
+    }
+}
+
+uint32 Player::RollNextSpell() const
+{
+    std::vector<uint32> randList;
+    for (UpgradingSpellMap::const_iterator itr = m_UpgradingSpellListForCurrentLevel.begin(); itr != m_UpgradingSpellListForCurrentLevel.end(); ++itr)
+    {
+        if (!itr->second)
+            randList.push_back(itr->first);
+    }
+
+    if (randList.size() == 0)
+        return 0;
+
+    return randList[urand(0, randList.size() - 1)];
+}
+
+void Player::ConsumeXP()
+{
+    uint32 level = getLevel();
+    if (level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+    {
+        if (CanLevelUp())
+        {
+            GiveLevel(level + 1);
+            if (level + 1 == sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+                LearnDefaultSkills();
+            else
+            {
+                InitSpellUpgradeInfoForLevel();
+                UpgradingNextSpell();
+                LearnRandomTalentForLevel();
+            }
+        }
+        else
+            LearnNewSpell();
+    }
+    else // supremacy
+    {
+        LearnDefaultSkills();
+        GiveSupremacyLevel();
+    }
+}
+
+void Player::LearnNewSpell()
+{
+    const LearnableSpell* spellData = xLegacyMgr->GetLearnableSpellData(getClass(), m_UpgradingSpell);
+    if (!spellData)
+    {
+        if (CanLevelUp())
+        {
+            ConsumeXP();
+            return;
+        }
+
+        TC_LOG_FATAL("entities.player", "(Learn New Spell) Upgrading Spell ID: %u Not Found! Player Class: %u, Level: %u, Guid: %u", m_UpgradingSpell, getClass(), getLevel(), GetGUID());
+        m_UpgradingSpell = RollNextSpell(); // roll and learn, but fix this after seeing this fatal msg.
+    }
+
+    CastSpell(this, 82026, TRIGGERED_FULL_MASK);
+    LearnSpell(m_UpgradingSpell, false);
+
+    CompleteAchievement(4868);
+
+    UpgradingSpellMap::iterator itr = m_UpgradingSpellListForCurrentLevel.find(m_UpgradingSpell);
+    ASSERT(itr != m_UpgradingSpellListForCurrentLevel.end());
+    itr->second = true;
+
+    if (CanLevelUp())
+        ConsumeXP();
+    else
+    {
+        uint32 nextSpell = RollNextSpell();
+        const LearnableSpell* nextSpellData = xLegacyMgr->GetLearnableSpellData(getClass(), nextSpell);
+        if (nextSpellData)
+        {
+            m_UpgradingSpell = nextSpell;
+            SetUInt32Value(PLAYER_NEXT_LEVEL_XP, nextSpellData->xp);
+        }
+        else
+        {
+            TC_LOG_ERROR("entities.player", "(Learn Next Spell) Upgrading Spell ID: %u Not Found! Player Class: %u, Level: %u", m_UpgradingSpell, getClass(), getLevel(), GetGUID());
+            m_UpgradingSpell = 0;
+            SetUInt32Value(PLAYER_NEXT_LEVEL_XP, 999999);
+        }
+    }
+}
+
+void Player::_LoadLearnedSpells(uint32 guid)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_LEARNED_SPELL);
+    stmt->setUInt32(0, GetGUID());
+    PreparedQueryResult result = CharacterDatabase.Query(stmt);
+    if (result)
+    {
+        do 
+        {
+            Field* fields = result->Fetch();
+            uint32 spell = fields[0].GetUInt32();
+            bool learned = fields[1].GetBool();
+            if (m_UpgradingSpellListForCurrentLevel.find(spell) != m_UpgradingSpellListForCurrentLevel.end())
+                m_UpgradingSpellListForCurrentLevel[spell] = learned;
+        } while (result->NextRow());
+    }
+}
+
+void Player::_SaveLearnedSpells(SQLTransaction& trans)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_LEARNED_SPELL);
+    stmt->setUInt32(0, GetGUID());
+    CharacterDatabase.Execute(stmt);
+    
+    for (UpgradingSpellMap::const_iterator itr = m_UpgradingSpellListForCurrentLevel.begin(); itr != m_UpgradingSpellListForCurrentLevel.end(); ++itr)
+    {
+        stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_LEARNED_SPELL);
+        stmt->setUInt32(0, GetGUID());
+        stmt->setUInt32(1, itr->first);
+        stmt->setBool(2, itr->second);
+        trans->Append(stmt);
+    }
+}
+
+bool Player::HasLearnedTalent(uint32 firstTalent, uint32 rank) const
+{
+    LearnedTalentMap::const_iterator itr = m_LearnedTalentMap.find(firstTalent);
+    if (itr == m_LearnedTalentMap.end())
+        return false;
+
+    return itr->second >= rank;
+}
+
+void Player::LearnNewTalent(const LearnableTalent* talent)
+{
+    m_LearnedTalentMap[talent->firstTalent] = talent->rank;
+
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_REP_LEARNED_TALENT);
+    stmt->setUInt32(0, GetGUID());
+    stmt->setUInt32(1, talent->firstTalent);
+    stmt->setUInt32(2, talent->rank);
+    CharacterDatabase.Execute(stmt);
+
+    if (!IsInWorld())                                    // will send in INITIAL_SPELLS in list anyway at map add
+        AddSpell(talent->talent, true, true, false, false);
+    else                                                // but send in normal spell in game learn case
+        LearnSpell(talent->talent, false);
+
+    CompleteAchievement(4869);
+}
+
+int32 Player::GetFreeTalentCount() const
+{
+    int32 slot = getLevel() < 10 ? 0 : getLevel() - 9;
+    if (HasAchieved(1283))
+        slot += 5;
+    if (HasAchieved(1284))
+        slot += 5;
+    if (HasAchieved(1287))
+        slot += 5;
+    if (HasAchieved(1288))
+        slot += 5;
+    if (HasAchieved(1289))
+        slot += 5;
+
+    slot -= GetSpentTalentCount();
+    return slot;
+}
+
+uint32 Player::GetSpentTalentCount() const
+{
+    uint32 point = 0;
+    for (LearnedTalentMap::const_iterator itr = m_LearnedTalentMap.begin(); itr != m_LearnedTalentMap.end(); ++itr)
+        point += itr->second;
+    return point;
+}
+
+bool Player::LearnTalentToLevel()
+{
+    int32 talentSlot = GetFreeTalentCount();
+    if (talentSlot <= 0)
+        return false;
+
+    for (uint32 i = 0; i != talentSlot; ++i)
+    {
+        const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(this);
+        if (talent)
+            LearnNewTalent(talent);
+    }
+
+    return true;
+}
+
+void Player::_LoadLearnedTalents(uint32 guid)
+{
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_LEARNED_TALENT);
+    stmt->setUInt32(0, GetGUID());
+    PreparedQueryResult result = CharacterDatabase.Query(stmt);
+    if (result)
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            m_LearnedTalentMap[fields[0].GetUInt32()] = fields[1].GetUInt32();
+        } while (result->NextRow());
+    }
+
+    LearnedTalentMap::const_iterator itr = m_LearnedTalentMap.begin();
+    while (itr != m_LearnedTalentMap.end())
+    {
+        if (uint32 talent = sSpellMgr->GetSpellWithRank(itr->first, itr->second))
+        {
+            if (!IsInWorld())                                    // will send in INITIAL_SPELLS in list anyway at map add
+                AddSpell(talent, true, true, true, false);
+            else                                                // but send in normal spell in game learn case
+                LearnSpell(talent, true);
+        }
+        else // @todo: do clean up
+            TC_LOG_ERROR("entities.player", "Player %u has invalid talent info - FirstTalent: %u, Rank: %u", guid, itr->first, itr->second);
+        ++itr;
+    }
+}
+
+void Player::AddSpellsForLevel()
+{
+    uint32 level = getLevel();
+    std::vector<uint32> list = xLegacyMgr->GetSpellsForLevel(getClass(), level);
+    for (uint32 i = 0; i != list.size(); ++i)
+    {
+        if (!IsInWorld())                                    // will send in INITIAL_SPELLS in list anyway at map add
+            AddSpell(list[i], true, true, false, false);
+        else                                                // but send in normal spell in game learn case
+            LearnSpell(list[i], false);
+    }
+}
+
+void Player::LearnRandomTalentForLevel()
+{
+    if (!CanLearnTalent())
+        return;
+
+    uint32 level = getLevel();
+    const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(this);
+
+    if (talent)
+        LearnNewTalent(talent);
+}
+
+bool Player::IsTalentLearnable(const LearnableTalent* talent) const
+{
+    if (getLevel() < talent->reqLevel)
+        return false;
+
+    LearnedTalentMap::const_iterator itr = m_LearnedTalentMap.find(talent->firstTalent);
+    if (itr != m_LearnedTalentMap.end())
+        return itr->second + 1 == talent->rank;
+    else if (talent->rank == 1)
+        return true;
+
+    return false;
+}
+
+void Player::AddGuildSpells()
+{
+    if (Guild* guild = GetGuild())
+    {
+        if (guild->HasRemoteBank())
+            AddSpell(82031, true, false, true, false);
+        else
+            RemoveSpell(82031);
+    }
+}
+
+void Player::RemoveGuildSpells()
+{
+    RemoveSpell(82031);
+}
+
+void Player::ResetLearnedTalent()
+{
+    for (LearnedTalentMap::const_iterator itr = m_LearnedTalentMap.begin(); itr != m_LearnedTalentMap.end(); ++itr)
+        RemoveSpell(itr->first, false, false);
+
+    m_LearnedTalentMap.clear();
 }
 
 bool Player::ValidateAppearance(uint8 race, uint8 class_, uint8 gender, uint8 hairID, uint8 hairColor, uint8 faceID, uint8 facialHair, uint8 skinColor, bool create /*=false*/)

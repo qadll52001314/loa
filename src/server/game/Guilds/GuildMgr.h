@@ -44,6 +44,7 @@ public:
 
     uint32 GenerateGuildId();
     void SetNextGuildId(uint32 Id) { NextGuildId = Id; }
+    void Update();
 
     void ResetTimes();
 protected:

@@ -48,6 +48,7 @@
 #include "GridNotifiers.h"
 #include "Formulas.h"
 #include "ScriptMgr.h"
+#include "SpellHistory.h"
 #include "GameObjectAI.h"
 #include "AccountMgr.h"
 #include "InstanceScript.h"
@@ -778,8 +779,8 @@ void Spell::EffectTriggerSpell(SpellEffIndex effIndex)
                     return;
 
                 // Reset cooldown on stealth if needed
-                if (unitTarget->ToPlayer()->HasSpellCooldown(1784))
-                    unitTarget->ToPlayer()->RemoveSpellCooldown(1784);
+                if (unitTarget->GetSpellHistory()->HasCooldown(1784))
+                    unitTarget->GetSpellHistory()->ResetCooldown(1784);
 
                 unitTarget->CastSpell(unitTarget, 1784, true);
                 return;
@@ -888,7 +889,7 @@ void Spell::EffectTriggerSpell(SpellEffIndex effIndex)
     // Remove spell cooldown (not category) if spell triggering spell with cooldown and same category
     if (m_caster->GetTypeId() == TYPEID_PLAYER && m_spellInfo->CategoryRecoveryTime && spellInfo->CategoryRecoveryTime
         && m_spellInfo->GetCategory() == spellInfo->GetCategory())
-        m_caster->ToPlayer()->RemoveSpellCooldown(spellInfo->Id);
+        m_caster->GetSpellHistory()->ResetCooldown(spellInfo->Id);
 
     // original caster guid only for GO cast
     m_caster->CastSpell(targets, spellInfo, &values, TRIGGERED_FULL_MASK, NULL, NULL, m_originalCasterGUID);
@@ -941,7 +942,7 @@ void Spell::EffectTriggerMissileSpell(SpellEffIndex effIndex)
     // Remove spell cooldown (not category) if spell triggering spell with cooldown and same category
     if (m_caster->GetTypeId() == TYPEID_PLAYER && m_spellInfo->CategoryRecoveryTime && spellInfo->CategoryRecoveryTime
         && m_spellInfo->GetCategory() == spellInfo->GetCategory())
-        m_caster->ToPlayer()->RemoveSpellCooldown(spellInfo->Id);
+        m_caster->GetSpellHistory()->ResetCooldown(spellInfo->Id);
 
     // original caster guid only for GO cast
     m_caster->CastSpell(targets, spellInfo, &values, TRIGGERED_FULL_MASK, NULL, NULL, m_originalCasterGUID);
@@ -1807,14 +1808,8 @@ void Spell::EffectEnergize(SpellEffIndex effIndex)
 
     m_caster->EnergizeBySpell(unitTarget, m_spellInfo->Id, damage, power);
 
-    if (Player* player = unitTarget->ToPlayer())
-    {
-        if (player->HasSkill(SKILL_SPEC_TIER2_5))
-        {
-            int32 value = 20 + 0.2 * player->GetSkillValue(SKILL_SPEC_TIER2_5);
-            player->CastCustomSpell(player, 81584, &value, NULL, NULL, true);
-        }
-    }
+    if (unitTarget->HasSpell(SPEC_SPELL_TIER2_5))
+        unitTarget->CastSpell(unitTarget, 81584, true);
 
     // Mad Alchemist's Potion
     if (m_spellInfo->Id == 45051)
@@ -3490,7 +3485,7 @@ void Spell::EffectInterruptCast(SpellEffIndex effIndex)
                 if (m_originalCaster)
                 {
                     int32 duration = m_spellInfo->GetDuration();
-                    unitTarget->ProhibitSpellSchool(curSpellInfo->GetSchoolMask(), unitTarget->ModSpellDuration(m_spellInfo, unitTarget, duration, false, 1 << effIndex));
+                    unitTarget->GetSpellHistory()->LockSpellSchool(curSpellInfo->GetSchoolMask(), unitTarget->ModSpellDuration(m_spellInfo, unitTarget, duration, false, 1 << effIndex));
                 }
                 ExecuteLogEffectInterruptCast(effIndex, unitTarget, curSpellInfo->Id);
                 unitTarget->InterruptSpell(CurrentSpellTypes(i), false);
@@ -5857,7 +5852,7 @@ void Spell::EffectCastButtons(SpellEffIndex effIndex)
         if (!spellInfo)
             continue;
 
-        if (!p_caster->HasSpell(spell_id) || p_caster->HasSpellCooldown(spell_id))
+        if (!p_caster->HasSpell(spell_id) || p_caster->GetSpellHistory()->HasCooldown(spell_id))
             continue;
 
         if (!spellInfo->HasAttribute(SPELL_ATTR7_SUMMON_PLAYER_TOTEM))
@@ -6286,24 +6281,13 @@ void Spell::EffectModifySpellCooldown(SpellEffIndex effIndex)
         return;
 
     Player* player = unitTarget->ToPlayer();
-
     const SpellInfo* spell = GetSpellInfo();
-    //if (spell->SpellFamilyName != player->GetSpellFamilyName())
-    //    return;
-
-    const SpellCooldowns& cm = player->GetSpellCooldownMap();
-    for (SpellCooldowns::const_iterator itr = cm.begin(); itr != cm.end();)
+    int32 damage = m_damage;
+    player->GetSpellHistory()->ModifyCooldowns([spell, damage](SpellHistory::CooldownStorageType::iterator itr) -> bool
     {
-        SpellInfo const* spell2 = sSpellMgr->EnsureSpellInfo(itr->first);
-
-        if (spell2->SpellFamilyName == spell->SpellFamilyName &&
-            (spell2->SpellFamilyFlags & spell->SpellFamilyFlags))
-        {
-            player->ModifySpellCooldown((itr++)->first, m_damage);
-        }
-        else
-            ++itr;
-    }
+        SpellInfo const* spellInfo = sSpellMgr->EnsureSpellInfo(itr->first);
+        return spellInfo->SpellFamilyName == spell->SpellFamilyName && (spell->SpellFamilyFlags & spellInfo->SpellFamilyFlags);
+    }, damage);
 }
 
 void Spell::EffectModifyAppliedAuraDuration(SpellEffIndex effIndex)

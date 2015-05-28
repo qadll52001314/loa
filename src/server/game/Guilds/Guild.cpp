@@ -1128,7 +1128,9 @@ Guild::Guild():
     m_createdDate(0),
     m_accountsNumber(0),
     m_bankMoney(0),
-    m_eventLog(NULL)
+    m_eventLog(NULL),
+    m_RemoteBank(0),
+    m_RemoteBankExpire(0)
 {
     memset(&m_bankEventLog, 0, (GUILD_BANK_MAX_TABS + 1) * sizeof(LogHolder*));
 }
@@ -1174,6 +1176,8 @@ bool Guild::Create(Player* pLeader, std::string const& name)
     m_bankMoney = 0;
     m_createdDate = ::time(NULL);
     _CreateLogHolders();
+    m_RemoteBank = false;
+    m_RemoteBankExpire = 0;
 
     TC_LOG_DEBUG("guild", "GUILD: creating guild [%s] for leader %s (%u)",
         name.c_str(), pLeader->GetName().c_str(), m_leaderGuid.GetCounter());
@@ -1198,6 +1202,8 @@ bool Guild::Create(Player* pLeader, std::string const& name)
     stmt->setUInt32(++index, m_emblemInfo.GetBorderColor());
     stmt->setUInt32(++index, m_emblemInfo.GetBackgroundColor());
     stmt->setUInt64(++index, m_bankMoney);
+    stmt->setBool(++index, m_RemoteBank);
+    stmt->setUInt32(++index, (uint32)m_RemoteBankExpire);
     trans->Append(stmt);
 
     CharacterDatabase.CommitTransaction(trans);
@@ -1948,8 +1954,10 @@ bool Guild::LoadFromDB(Field* fields)
     m_motd          = fields[9].GetString();
     m_createdDate   = time_t(fields[10].GetUInt32());
     m_bankMoney     = fields[11].GetUInt64();
+    m_RemoteBank = fields[12].GetBool();
+    m_RemoteBankExpire = time_t(fields[13].GetUInt32());
 
-    uint8 purchasedTabs = uint8(fields[12].GetUInt64());
+    uint8 purchasedTabs = uint8(fields[14].GetUInt64());
     if (purchasedTabs > GUILD_BANK_MAX_TABS)
         purchasedTabs = GUILD_BANK_MAX_TABS;
 
@@ -2279,6 +2287,9 @@ bool Guild::AddMember(ObjectGuid guid, uint8 rankId)
     // Call scripts if member was succesfully added (and stored to database)
     sScriptMgr->OnGuildAddMember(this, player, rankId);
 
+    if (player)
+        player->AddGuildSpells();
+
     return true;
 }
 
@@ -2334,6 +2345,7 @@ void Guild::DeleteMember(ObjectGuid guid, bool isDisbanding, bool isKicked, bool
     {
         player->SetInGuild(0);
         player->SetRank(0);
+        player->RemoveGuildSpells();
     }
 
     _DeleteMemberFromDB(lowguid);
@@ -2924,4 +2936,49 @@ void Guild::ResetTimes()
         itr->second->ResetValues();
 
     _BroadcastEvent(GE_BANK_TAB_AND_MONEY_UPDATED, ObjectGuid::Empty);
+}
+
+void Guild::SetRemoteBank(bool enable)
+{
+    m_RemoteBank = enable;
+    m_RemoteBankExpire = time(NULL) + IN_MILLISECONDS*WEEK;
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_REMOTE_BANK);
+    stmt->setBool(0, m_RemoteBank);
+    stmt->setUInt32(1, (uint32)m_RemoteBankExpire);
+    stmt->setUInt32(2, GetId());
+    CharacterDatabase.Execute(stmt);
+
+    if (enable)
+    {
+        for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+        {
+            if (Player* player = itr->second->FindPlayer())
+            {
+                if (!player->IsInWorld())
+                    player->AddSpell(82031, true, false, true, false);
+                else
+                {
+                    ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(101).c_str());
+                    player->LearnSpell(82031, true);
+                }
+            }
+        }
+    }
+    else
+    {
+        for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+        {
+            if (Player* player = itr->second->FindPlayer())
+            {
+                player->RemoveSpell(82031);
+                ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(100).c_str());
+            }
+        }
+    }
+}
+
+void Guild::Update()
+{
+    if (HasRemoteBank() && m_RemoteBankExpire < time(NULL))
+        SetRemoteBank(false);
 }

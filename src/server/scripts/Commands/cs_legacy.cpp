@@ -21,9 +21,16 @@ public:
             { NULL, 0, false, NULL, "", NULL }
         };
 
+        static ChatCommand legacyTestCommandTable[] =
+        {
+            { "levelto", rbac::RBAC_PERM_COMMAND_LEGACY, true, &HandleTestSetLevelTo, "", NULL },
+            { NULL, 0, false, NULL, "", NULL }
+        };
+
         static ChatCommand legacyCommandTable[] =
         {
             { "add", rbac::RBAC_PERM_COMMAND_LEGACY_ADD, false, NULL, "", addCommandTable },
+            { "test", rbac::RBAC_PERM_COMMAND_LEGACY, false, NULL, "", legacyTestCommandTable },
             { "", rbac::RBAC_PERM_COMMAND_LEGACY, false, &HandleLegacyCommand, "", NULL },
             { NULL, 0, false, NULL, "", NULL }
         };
@@ -34,6 +41,11 @@ public:
             { NULL, 0, false, NULL, "", NULL }
         };
         return commandTable;
+    }
+
+    static bool HandleTestSetLevelTo(ChatHandler* handler, char const* args)
+    {
+        return true;
     }
 
     static bool HandleAddMemoryCode(ChatHandler* handler, char const* args)

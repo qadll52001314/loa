@@ -489,14 +489,14 @@ void World::LoadConfigSettings(bool reload)
     rate_values[RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE] = sConfigMgr->GetFloatDefault("Rate.Creature.Elite.WORLDBOSS.SpellDamage", 1.0f);
     rate_values[RATE_CREATURE_ELITE_RARE_SPELLDAMAGE]      = sConfigMgr->GetFloatDefault("Rate.Creature.Elite.RARE.SpellDamage", 1.0f);
     rate_values[RATE_CREATURE_HEALTH_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp0", 1.0f);
-    rate_values[RATE_CREATURE_HEALTH_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp1", 2.0f);
-    rate_values[RATE_CREATURE_HEALTH_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp2", 4.0f);
+    rate_values[RATE_CREATURE_HEALTH_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp1", 1.0f);
+    rate_values[RATE_CREATURE_HEALTH_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Health.Exp2", 1.0f);
     rate_values[RATE_CREATURE_DAMAGE_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp0", 1.0f);
-    rate_values[RATE_CREATURE_DAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp1", 2.0f);
-    rate_values[RATE_CREATURE_DAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp2", 4.0f);
+    rate_values[RATE_CREATURE_DAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp1", 1.0f);
+    rate_values[RATE_CREATURE_DAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.Damage.Exp2", 1.0f);
     rate_values[RATE_CREATURE_SDAMAGE_EXP0] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp0", 1.0f);
-    rate_values[RATE_CREATURE_SDAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp1", 2.0f);
-    rate_values[RATE_CREATURE_SDAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp2", 4.0f);
+    rate_values[RATE_CREATURE_SDAMAGE_EXP1] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp1", 1.0f);
+    rate_values[RATE_CREATURE_SDAMAGE_EXP2] = sConfigMgr->GetFloatDefault("Rate.Creature.SDamage.Exp2", 1.0f);
     rate_values[RATE_CREATURE_AGGRO]  = sConfigMgr->GetFloatDefault("Rate.Creature.Aggro", 1.0f);
     rate_values[RATE_REST_INGAME]                    = sConfigMgr->GetFloatDefault("Rate.Rest.InGame", 1.0f);
     rate_values[RATE_REST_OFFLINE_IN_TAVERN_OR_CITY] = sConfigMgr->GetFloatDefault("Rate.Rest.Offline.InTavernOrCity", 1.0f);
@@ -1517,6 +1517,9 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Loading Item set names...");                // must be after LoadItemPrototypes
     sObjectMgr->LoadItemSetNames();
 
+    TC_LOG_INFO("server.loading", "Loading Creature Strength Data...");
+    sObjectMgr->LoadCreatureStrengthData();
+
     TC_LOG_INFO("server.loading", "Loading Creature Model Based Info Data...");
     sObjectMgr->LoadCreatureModelInfo();
 
@@ -1561,6 +1564,9 @@ void World::SetInitialWorldSettings()
 
     TC_LOG_INFO("server.loading", "Loading Gameobject Data...");
     sObjectMgr->LoadGameobjects();
+    
+    TC_LOG_INFO("server.loading", "Loading GameObject Addon Data...");
+    sObjectMgr->LoadGameObjectAddons();                          // must be after LoadGameObjectTemplate() and LoadGameobjects()
 
     TC_LOG_INFO("server.loading", "Loading Creature Linked Respawn...");
     sObjectMgr->LoadLinkedRespawn();                             // must be after LoadCreatures(), LoadGameObjects()
@@ -1824,6 +1830,7 @@ void World::SetInitialWorldSettings()
 
     m_timers[WUPDATE_CAPITALCITY].SetInterval(15*IN_MILLISECONDS*MINUTE);
     m_timers[WUPDATE_CC_RESEARCH].SetInterval(IN_MILLISECONDS*MINUTE);
+    m_timers[WUPDATE_GUILD].SetInterval(IN_MILLISECONDS*HOUR);
 
     //to set mailtimer to return mails every day between 4 and 5 am
     //mailtimer is increased when updating auctions
@@ -2217,6 +2224,12 @@ void World::Update(uint32 diff)
     {
         m_timers[WUPDATE_CC_RESEARCH].Reset();
         xCapitalCityMgr->ResearchUpdate();
+    }
+
+    if (m_timers[WUPDATE_GUILD].Passed())
+    {
+        m_timers[WUPDATE_GUILD].Reset();
+        sGuildMgr->Update();
     }
 
     // update the instance reset times

@@ -620,9 +620,9 @@ int32 Item::GenerateItemRandomPropertyId(uint32 item_id)
     if ((!itemProto->RandomProperty) && (!itemProto->RandomSuffix))
     {
         if (!urand(0, 4))
-            return xLegacyMgr->RollLegacyEnchantOfRank(urand(1, 8));
-        else if (!urand(0, 9))
-            return xLegacyMgr->RollLegacyEnchantOfRank(urand(9, 15));
+            return xLegacyMgr->RollLegacyEnchantOfRank(urand(1, 5));
+        else if (!urand(0, 20))
+            return xLegacyMgr->RollLegacyEnchantOfRank(urand(6, 15));
         return 0;
     }
 

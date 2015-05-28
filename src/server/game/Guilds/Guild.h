@@ -359,7 +359,6 @@ private:
         uint8 m_rankId;
         std::string m_publicNote;
         std::string m_officerNote;
-
         int32 m_bankWithdraw[GUILD_BANK_MAX_TABS + 1];
     };
 
@@ -744,6 +743,10 @@ public:
 
     void ResetTimes();
 
+    bool HasRemoteBank() const { return m_RemoteBank; }
+    void SetRemoteBank(bool enable);
+    void Update();
+
 protected:
     uint32 m_id;
     std::string m_name;
@@ -763,6 +766,8 @@ protected:
     // These are actually ordered lists. The first element is the oldest entry.
     LogHolder* m_eventLog;
     LogHolder* m_bankEventLog[GUILD_BANK_MAX_TABS + 1];
+    bool m_RemoteBank;
+    time_t m_RemoteBankExpire;
 
 private:
     inline uint8 _GetRanksSize() const { return uint8(m_ranks.size()); }

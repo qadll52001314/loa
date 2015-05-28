@@ -14,6 +14,7 @@ struct CollectableMemory
     uint32 mail;
     uint32 sender;
     uint32 text;
+    uint32 achievement;
 };
 
 struct MemoryCode

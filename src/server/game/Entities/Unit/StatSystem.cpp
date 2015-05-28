@@ -180,7 +180,7 @@ void Player::ApplySpellPowerBonus(int32 amount, bool apply)
 
 void Player::ApplySpellDamageBonus(int32 amount, bool apply)
 {
-    apply = _ModifyUInt32(apply, m_baseSpellPower, amount);
+    apply = _ModifyUInt32(apply, m_baseSpellDamage, amount);
 
     for (int i = SPELL_SCHOOL_HOLY; i < MAX_SPELL_SCHOOL; ++i)
         ApplyModUInt32Value(PLAYER_FIELD_MOD_DAMAGE_DONE_POS + i, amount, apply);
@@ -188,7 +188,7 @@ void Player::ApplySpellDamageBonus(int32 amount, bool apply)
 
 void Player::ApplySpellHealingBonus(int32 amount, bool apply)
 {
-    apply = _ModifyUInt32(apply, m_baseSpellPower, amount);
+    apply = _ModifyUInt32(apply, m_baseSpellHealing, amount);
 
     // For speed just update for client
     ApplyModUInt32Value(PLAYER_FIELD_MOD_HEALING_DONE_POS, amount, apply);
@@ -275,9 +275,6 @@ void Player::UpdateArmor()
     }
 
     value *= GetModifierValue(unitMod, TOTAL_PCT);
-
-    if (HasSkill(SKILL_SPEC_TIER4_2))
-        value *= 1.0f + 0.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER4_2);
 
     SetArmor(int32(value));
 
@@ -651,6 +648,9 @@ void Player::UpdateCritPercentage(WeaponAttackType attType)
     // Modify crit from weapon skill and maximized defense skill of same level victim difference
     value += (int32(GetWeaponSkillValue(attType)) - int32(GetMaxSkillValueForLevel())) * 0.04f;
 
+    if (index == PLAYER_CRIT_PERCENTAGE && HasSpell(TS_ROGUE_ASSASSINATION))
+        value += QuadraticLinarBenefit(25.0f, 100.0f, GetStat(STAT_AGILITY));
+
     if (sWorld->getBoolConfig(CONFIG_STATS_LIMITS_ENABLE))
          value = value > sWorld->getFloatConfig(CONFIG_STATS_LIMITS_CRIT) ? sWorld->getFloatConfig(CONFIG_STATS_LIMITS_CRIT) : value;
 
@@ -661,9 +661,6 @@ void Player::UpdateCritPercentage(WeaponAttackType attType)
 void Player::UpdateAllCritPercentages()
 {
     float value = GetMeleeCritFromAgility();
-
-    if (HasSkill(SKILL_SPEC_TIER1_5))
-        value += 10.0f + 0.1f * GetSkillValue(SKILL_SPEC_TIER1_5);
 
     SetBaseModValue(CRIT_PERCENTAGE, PCT_MOD, value);
     SetBaseModValue(OFFHAND_CRIT_PERCENTAGE, PCT_MOD, value);
@@ -787,6 +784,11 @@ void Player::UpdateDodgePercentage()
     uint32 pclass = getClass()-1;
     float value = nondiminishing + (diminishing * dodge_cap[pclass] / (diminishing + dodge_cap[pclass] * m_diminishing_k[pclass]));
 
+    if (HasSpell(TS_ROGUE_COMBAT))
+        value += QuadraticLinarBenefit(25.0f, 100.0f, GetStat(STAT_AGILITY));
+    else if (HasSpell(TS_SHAMAN_ENHANCEMENT))
+        value += QuadraticLinarBenefit(25.0f, 100.0f, GetStat(STAT_AGILITY));
+
     if (sWorld->getBoolConfig(CONFIG_STATS_LIMITS_ENABLE))
          value = value > sWorld->getFloatConfig(CONFIG_STATS_LIMITS_DODGE) ? sWorld->getFloatConfig(CONFIG_STATS_LIMITS_DODGE) : value;
 
@@ -815,8 +817,8 @@ void Player::UpdateSpellCritChance(uint32 school)
     // Increase crit from spell crit ratings
     crit += GetRatingBonusValue(CR_CRIT_SPELL);
 
-    if (HasSkill(SKILL_SPEC_TIER1_5))
-        crit += 10.0f + 0.1f * GetSkillValue(SKILL_SPEC_TIER1_5);
+    if (HasSpell(TS_SHAMAN_ELEMENTAL))
+        crit += QuadraticLinarBenefit(25.0f, 100.0f, GetStat(STAT_INTELLECT));
 
     // Store crit value
     SetFloatValue(PLAYER_SPELL_CRIT_PERCENTAGE1 + school, crit);
@@ -917,10 +919,17 @@ void Player::UpdateManaRegen()
         power_regen_mp5 += GetStat(Stats((*i)->GetMiscValue())) * (*i)->GetAmount() / 500.0f;
     }
 
-    if (HasSkill(SKILL_SPEC_TIER1_10))
+    if (HasSpell(SPEC_SPELL_TIER1_10))
     {
-        power_regen_mp5 *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
-        power_regen *= 1.1f + 0.001f * GetSkillValue(SKILL_SPEC_TIER1_10);
+        power_regen_mp5 *= 1.1f;
+        power_regen *= 1.1f;
+    }
+
+    if (HasSpell(TS_SHAMAN_RESTORATION))
+    {
+        float r = QuadraticLinarBenefit(150.0f, 100.0f, GetStat(STAT_INTELLECT));
+        ApplyPct(power_regen, r);
+        ApplyPct(power_regen_mp5, r);
     }
 
     // Set regen rate in cast state apply only on spirit based regen
@@ -959,16 +968,6 @@ void Player::_ApplyAllStatBonuses()
 
     _ApplyAllAuraStatMods();
     _ApplyAllItemMods();
-
-    // apply spec2-2 effects
-    if (HasSkill(SKILL_SPEC_TIER2_2))
-    {
-        float val = -0.1f - 0.001f * GetSkillValue(SKILL_SPEC_TIER2_2);
-        ApplyPercentModFloatValue(UNIT_MOD_CAST_SPEED, val, true);
-        ApplyPercentModFloatValue(UNIT_FIELD_BASEATTACKTIME + BASE_ATTACK, val, true);
-        ApplyPercentModFloatValue(UNIT_FIELD_BASEATTACKTIME + OFF_ATTACK, val, true);
-        ApplyPercentModFloatValue(UNIT_FIELD_RANGEDATTACKTIME, val, true);
-    }
 
     SetCanModifyStats(true);
 
@@ -1120,6 +1119,8 @@ void Creature::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, 
     float totalValue       = GetModifierValue(unitMod, TOTAL_VALUE);
     float totalPct         = addTotalPct ? GetModifierValue(unitMod, TOTAL_PCT) : 1.0f;
     float dmgMultiplier    = GetCreatureTemplate()->ModDamage; // = ModDamage * _GetDamageMod(rank);
+    if (CreatureStrengthData const* data = sObjectMgr->GetCreatureStrengthData(GetMapId()))
+        dmgMultiplier *= data->damageFactor;
 
     minDamage = ((weaponMinDamage + baseValue) * dmgMultiplier * basePct + totalValue) * totalPct;
     maxDamage = ((weaponMaxDamage + baseValue) * dmgMultiplier * basePct + totalValue) * totalPct;

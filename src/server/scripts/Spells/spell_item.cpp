@@ -24,10 +24,13 @@
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 #include "SkillDiscovery.h"
 #include "Battleground.h"
+#include "LegacyMgr.h"
+#include "AchievementMgr.h"
 
 // Generic script for handling item dummy effects which trigger another spell.
 class spell_item_trigger_spell : public SpellScriptLoader
@@ -1349,7 +1352,7 @@ class spell_item_red_rider_air_rifle : public SpellScriptLoader
                     caster->CastSpell(caster, SPELL_AIR_RIFLE_HOLD_VISUAL, true);
                     // needed because this spell shares GCD with its triggered spells (which must not be cast with triggered flag)
                     if (Player* player = caster->ToPlayer())
-                        player->GetGlobalCooldownMgr().CancelGlobalCooldown(GetSpellInfo());
+                        player->GetSpellHistory()->CancelGlobalCooldown(GetSpellInfo());
                     if (urand(0, 4))
                         caster->CastSpell(target, SPELL_AIR_RIFLE_SHOOT, false);
                     else
@@ -2368,7 +2371,7 @@ class spell_item_rocket_boots : public SpellScriptLoader
                 if (Battleground* bg = caster->GetBattleground())
                     bg->EventPlayerDroppedFlag(caster);
 
-                caster->RemoveSpellCooldown(SPELL_ROCKET_BOOTS_PROC);
+                caster->GetSpellHistory()->ResetCooldown(SPELL_ROCKET_BOOTS_PROC);
                 caster->CastSpell(caster, SPELL_ROCKET_BOOTS_PROC, true, NULL);
             }
 
@@ -2548,14 +2551,14 @@ class spell_item_refocus : public SpellScriptLoader
                 if (!caster || caster->getClass() != CLASS_HUNTER)
                     return;
 
-                if (caster->HasSpellCooldown(SPELL_AIMED_SHOT))
-                    caster->RemoveSpellCooldown(SPELL_AIMED_SHOT, true);
+                if (caster->GetSpellHistory()->HasCooldown(SPELL_AIMED_SHOT))
+                    caster->GetSpellHistory()->ResetCooldown(SPELL_AIMED_SHOT, true);
 
-                if (caster->HasSpellCooldown(SPELL_MULTISHOT))
-                    caster->RemoveSpellCooldown(SPELL_MULTISHOT, true);
+                if (caster->GetSpellHistory()->HasCooldown(SPELL_MULTISHOT))
+                    caster->GetSpellHistory()->ResetCooldown(SPELL_MULTISHOT, true);
 
-                if (caster->HasSpellCooldown(SPELL_VOLLEY))
-                    caster->RemoveSpellCooldown(SPELL_VOLLEY, true);
+                if (caster->GetSpellHistory()->HasCooldown(SPELL_VOLLEY))
+                    caster->GetSpellHistory()->ResetCooldown(SPELL_VOLLEY, true);
             }
 
             void Register() override
@@ -2742,6 +2745,44 @@ public:
             Player* player = GetCaster()->ToPlayer();
             int32 level = GetSpellInfo()->Effects[0].CalcValue();
             player->GiveLevel(level);
+
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                player->SetCanLearnTalent(true);
+
+                int32 count = player->GetFreeTalentCount();
+                if (count <= 0)
+                    return;
+
+                if (count <= 71)
+                {
+                    for (uint32 i = 10; i <= player->getLevel(); ++i)
+                    {
+                        const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                        if (talent)
+                            player->LearnNewTalent(talent);
+                    }
+                }
+                else
+                {
+                    count -= 71;
+                    for (uint32 i = 10; i <= player->getLevel(); ++i)
+                    {
+                        const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                        if (talent)
+                            player->LearnNewTalent(talent);
+                    }
+
+                    for (int32 i = 1; i <= count; ++i)
+                    {
+                        const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player);
+                        if (talent)
+                            player->LearnNewTalent(talent);
+                    }
+                }
+            }
+
+            player->CompleteAchievement(4873);
         }
 
         void Register() override
@@ -2879,6 +2920,7 @@ public:
     }
 };
 
+// 81917
 class spell_item_hexentanz_energy_convert : public SpellScriptLoader
 {
 public:
@@ -2974,6 +3016,431 @@ public:
     }
 };
 
+// 81934
+class spell_item_talent_simulation : public SpellScriptLoader
+{
+public:
+    spell_item_talent_simulation() : SpellScriptLoader("spell_item_talent_simulation") {}
+
+    class spell_item_talent_simulation_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_talent_simulation_SpellScript);
+
+        void HandleHit()
+        {
+            if (Player* player = GetCaster()->ToPlayer())
+            {
+                if (!player->CanLearnTalent())
+                {
+                    player->SetCanLearnTalent(true);
+
+                    int32 count = player->GetFreeTalentCount();
+                    if (count <= 0)
+                        return;
+
+                    if (count <= 71)
+                    {
+                        for (uint32 i = 10; i <= player->getLevel(); ++i)
+                        {
+                            const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                            if (talent)
+                                player->LearnNewTalent(talent);
+                        }
+                    }
+                    else
+                    {
+                        count -= 71;
+                        for (uint32 i = 10; i <= player->getLevel(); ++i)
+                        {
+                            const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                            if (talent)
+                                player->LearnNewTalent(talent);
+                        }
+
+                        for (int32 i = 1; i <= count; ++i)
+                        {
+                            const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player);
+                            if (talent)
+                                player->LearnNewTalent(talent);
+                        }
+                    }
+
+                    player->CompleteAchievement(4842);
+                }
+            }
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_talent_simulation_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_talent_simulation_SpellScript();
+    }
+};
+
+// 
+class spell_item_learn_skill : public SpellScriptLoader
+{
+public:
+    spell_item_learn_skill() : SpellScriptLoader("spell_item_learn_skill") {}
+    
+    class spell_item_learn_skill_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_learn_skill_SpellScript);
+
+        void HandleHit()
+        {
+            uint32 skillSpell = GetSpellInfo()->Effects[0].TriggerSpell;
+            uint32 skillLine = GetSpellInfo()->Effects[0].MiscValue;
+            uint32 skillValue = GetSpellInfo()->Effects[0].CalcValue();
+
+            Player* player = GetCaster()->ToPlayer();
+
+            player->LearnSpell(skillSpell, false);
+            player->SetSkill(skillLine, 0, skillValue, skillValue);
+
+            player->CompleteAchievement(4874);
+        }
+        
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_learn_skill_SpellScript::HandleHit);
+        }
+    };
+    
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_learn_skill_SpellScript();
+    }
+};
+
+// 
+class spell_item_learn_all_weapon_skill : public SpellScriptLoader
+{
+public:
+    spell_item_learn_all_weapon_skill() : SpellScriptLoader("spell_item_learn_all_weapon_skill") {}
+    
+    class spell_item_learn_all_weapon_skill_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_learn_all_weapon_skill_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->UpdateSkillsToMaxSkillsForLevel();
+        }
+        
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_learn_all_weapon_skill_SpellScript::HandleHit);
+        }
+    };
+    
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_learn_all_weapon_skill_SpellScript();
+    }
+};
+
+// 82066
+class spell_item_war_memory_chapter1 : public SpellScriptLoader
+{
+public:
+    spell_item_war_memory_chapter1() : SpellScriptLoader("spell_item_war_memory_chapter1") {}
+    
+    class spell_item_war_memory_chapter1_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_war_memory_chapter1_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->CompleteAchievement(628);
+            player->CompleteAchievement(629);
+            player->CompleteAchievement(630);
+            player->CompleteAchievement(631);
+            player->CompleteAchievement(632);
+            player->CompleteAchievement(633);
+            player->CompleteAchievement(634);
+            player->CompleteAchievement(635);
+            player->CompleteAchievement(636);
+            player->CompleteAchievement(637);
+            player->CompleteAchievement(638);
+            player->CompleteAchievement(639);
+            player->CompleteAchievement(640);
+            player->CompleteAchievement(641);
+            player->CompleteAchievement(642);
+            player->CompleteAchievement(643);
+            player->CompleteAchievement(644);
+            player->CompleteAchievement(645);
+            player->CompleteAchievement(646);
+        }
+        
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_war_memory_chapter1_SpellScript::HandleHit);
+        }
+    };
+    
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_war_memory_chapter1_SpellScript();
+    }
+};
+
+// 82067
+class spell_item_war_memory_chapter2 : public SpellScriptLoader
+{
+public:
+    spell_item_war_memory_chapter2() : SpellScriptLoader("spell_item_war_memory_chapter2") {}
+
+    class spell_item_war_memory_chapter2_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_war_memory_chapter2_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->CompleteAchievement(647);
+            player->CompleteAchievement(648);
+            player->CompleteAchievement(649);
+            player->CompleteAchievement(650);
+            player->CompleteAchievement(651);
+            player->CompleteAchievement(652);
+            player->CompleteAchievement(653);
+            player->CompleteAchievement(654);
+            player->CompleteAchievement(655);
+            player->CompleteAchievement(656);
+            player->CompleteAchievement(657);
+            player->CompleteAchievement(658);
+            player->CompleteAchievement(659);
+            player->CompleteAchievement(660);
+            player->CompleteAchievement(666);
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_war_memory_chapter2_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_war_memory_chapter2_SpellScript();
+    }
+};
+
+// 82068
+class spell_item_war_memory_chapter3 : public SpellScriptLoader
+{
+public:
+    spell_item_war_memory_chapter3() : SpellScriptLoader("spell_item_war_memory_chapter3") {}
+
+    class spell_item_war_memory_chapter3_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_war_memory_chapter3_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->CompleteAchievement(667);
+            player->CompleteAchievement(668);
+            player->CompleteAchievement(669);
+            player->CompleteAchievement(670);
+            player->CompleteAchievement(671);
+            player->CompleteAchievement(672);
+            player->CompleteAchievement(673);
+            player->CompleteAchievement(674);
+            player->CompleteAchievement(675);
+            player->CompleteAchievement(676);
+            player->CompleteAchievement(677);
+            player->CompleteAchievement(678);
+            player->CompleteAchievement(679);
+            player->CompleteAchievement(680);
+            player->CompleteAchievement(681);
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_war_memory_chapter3_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_war_memory_chapter3_SpellScript();
+    }
+};
+
+// 82069
+class spell_item_war_memory_chapter4 : public SpellScriptLoader
+{
+public:
+    spell_item_war_memory_chapter4() : SpellScriptLoader("spell_item_war_memory_chapter4") {}
+
+    class spell_item_war_memory_chapter4_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_war_memory_chapter4_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->CompleteAchievement(477);
+            player->CompleteAchievement(478);
+            player->CompleteAchievement(479);
+            player->CompleteAchievement(480);
+            player->CompleteAchievement(481);
+            player->CompleteAchievement(482);
+            player->CompleteAchievement(483);
+            player->CompleteAchievement(484);
+            player->CompleteAchievement(485);
+            player->CompleteAchievement(486);
+            player->CompleteAchievement(487);
+            player->CompleteAchievement(488);
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_war_memory_chapter4_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_war_memory_chapter4_SpellScript();
+    }
+};
+
+// 82070
+class spell_item_war_memory_chapter5 : public SpellScriptLoader
+{
+public:
+    spell_item_war_memory_chapter5() : SpellScriptLoader("spell_item_war_memory_chapter5") {}
+
+    class spell_item_war_memory_chapter5_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_war_memory_chapter5_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->CompleteAchievement(489);
+            player->CompleteAchievement(490);
+            player->CompleteAchievement(491);
+            player->CompleteAchievement(492);
+            player->CompleteAchievement(493);
+            player->CompleteAchievement(494);
+            player->CompleteAchievement(495);
+            player->CompleteAchievement(496);
+            player->CompleteAchievement(497);
+            player->CompleteAchievement(498);
+            player->CompleteAchievement(499);
+            player->CompleteAchievement(500);
+        }
+
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_war_memory_chapter5_SpellScript::HandleHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_war_memory_chapter5_SpellScript();
+    }
+};
+
+// 82071
+class spell_item_relearn_talent : public SpellScriptLoader
+{
+public:
+    spell_item_relearn_talent() : SpellScriptLoader("spell_item_relearn_talent") {}
+    
+    class spell_item_relearn_talent_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_relearn_talent_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->ResetLearnedTalent();
+            player->SetCanLearnTalent(true);
+            int32 count = player->GetFreeTalentCount();
+            if (count <= 0)
+                return;
+
+            if (count <= 71)
+            {
+                for (uint32 i = 10; i <= player->getLevel(); ++i)
+                {
+                    const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                    if (talent)
+                        player->LearnNewTalent(talent);
+                }
+            }
+            else
+            {
+                count -= 71;
+                for (uint32 i = 10; i <= player->getLevel(); ++i)
+                {
+                    const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player, i);
+                    if (talent)
+                        player->LearnNewTalent(talent);
+                }
+
+                for (int32 i = 1; i <= count; ++i)
+                {
+                    const LearnableTalent* talent = xLegacyMgr->GetNextTalentForPlayer(player);
+                    if (talent)
+                        player->LearnNewTalent(talent);
+                }
+            }
+        }
+        
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_relearn_talent_SpellScript::HandleHit);
+        }
+    };
+    
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_relearn_talent_SpellScript();
+    }
+};
+
+// 82072
+class spell_item_reset_prefered_talent_category : public SpellScriptLoader
+{
+public:
+    spell_item_reset_prefered_talent_category() : SpellScriptLoader("spell_item_reset_prefered_talent_category") {}
+    
+    class spell_item_reset_prefered_talent_category_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_item_reset_prefered_talent_category_SpellScript);
+
+        void HandleHit()
+        {
+            Player* player = GetCaster()->ToPlayer();
+            player->SetPreperedTalentCategory(-1);
+        }
+        
+        void Register() override
+        {
+            OnHit += SpellHitFn(spell_item_reset_prefered_talent_category_SpellScript::HandleHit);
+        }
+    };
+    
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_item_reset_prefered_talent_category_SpellScript();
+    }
+};
+
 void AddSC_item_spell_scripts()
 {
     // 23074 Arcanite Dragonling
@@ -3053,4 +3520,14 @@ void AddSC_item_spell_scripts()
     new spell_item_hexentanz_energy_convert();
     new spell_item_nahemarr_proc();
     new spell_item_nahemarr_proc_activated();
+    new spell_item_talent_simulation();
+    new spell_item_learn_skill();
+    new spell_item_war_memory_chapter1();
+    new spell_item_war_memory_chapter2();
+    new spell_item_war_memory_chapter3();
+    new spell_item_war_memory_chapter4();
+    new spell_item_war_memory_chapter5();
+    new spell_item_relearn_talent();
+    new spell_item_reset_prefered_talent_category();
+    new spell_item_learn_all_weapon_skill();
 }

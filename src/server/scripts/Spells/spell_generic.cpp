@@ -34,6 +34,7 @@
 #include "Pet.h"
 #include "ReputationMgr.h"
 #include "SkillDiscovery.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 #include "Vehicle.h"
@@ -1293,8 +1294,8 @@ class spell_gen_divine_storm_cd_reset : public SpellScriptLoader
             void HandleScript(SpellEffIndex /*effIndex*/)
             {
                 Player* caster = GetCaster()->ToPlayer();
-                if (caster->HasSpellCooldown(SPELL_DIVINE_STORM))
-                    caster->RemoveSpellCooldown(SPELL_DIVINE_STORM, true);
+                if (caster->GetSpellHistory()->HasCooldown(SPELL_DIVINE_STORM))
+                    caster->GetSpellHistory()->ResetCooldown(SPELL_DIVINE_STORM, true);
             }
 
             void Register() override
@@ -3330,7 +3331,7 @@ class spell_pvp_trinket_wotf_shared_cd : public SpellScriptLoader
             {
                 // This is only needed because spells cast from spell_linked_spell are triggered by default
                 // Spell::SendSpellCooldown() skips all spells with TRIGGERED_IGNORE_SPELL_AND_CATEGORY_CD
-                GetCaster()->ToPlayer()->AddSpellAndCategoryCooldowns(GetSpellInfo(), GetCastItem() ? GetCastItem()->GetEntry() : 0, GetSpell());
+                GetCaster()->GetSpellHistory()->StartCooldown(GetSpellInfo(), 0, GetSpell());
             }
 
             void Register() override
@@ -4158,16 +4159,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_1);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER1_1);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_1);
-            int32 damage = CalculatePct(player->GetPrimaryStat(), 10.0f + skillvalue * 0.2f);
-            player->CastCustomSpell(procInfo.GetProcTarget(), 81570, &damage, NULL, NULL, true);
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            player->CastCustomSpell(81570, procInfo.GetProcTarget(), &damage, NULL, NULL, true, NULL, NULL, player->GetGUID(), procInfo.GetDamageInfo()->GetSchoolMask());
         }
 
         void Register() override
@@ -4195,16 +4194,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_1);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER1_1);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_1);
-            int32 damage = CalculatePct(player->GetPrimaryStat(), 10.0f + skillvalue * 0.2f);
-            player->CastCustomSpell(procInfo.GetProcTarget(), 81571, &damage, NULL, NULL, true);
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            player->CastCustomSpell(81571, procInfo.GetProcTarget(), &damage, NULL, NULL, true, NULL, NULL, player->GetGUID(), procInfo.GetDamageInfo()->GetSchoolMask());
         }
 
         void Register() override
@@ -4232,19 +4229,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_2);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER1_2);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_2);
-            if (frand(0, 100.0f) < (5.0f + skillvalue * 0.1f))
-            {
-                int32 damage = CalculatePct(player->GetPrimaryStat(), 150.0f);
-                player->CastCustomSpell(procInfo.GetProcTarget(), 81572, &damage, NULL, NULL, true);
-            }
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            player->CastCustomSpell(81572, procInfo.GetProcTarget(), &damage, NULL, NULL, true, NULL, NULL, player->GetGUID(), procInfo.GetDamageInfo()->GetSchoolMask());
         }
 
         void Register() override
@@ -4272,19 +4264,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_2);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER1_2);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            int32 skillvalue = player->GetSkillValue(SKILL_SPEC_TIER1_2);
-            if (frand(0, 100.0f) < (5.0f + skillvalue * 0.1f))
-            {
-                int32 damage = CalculatePct(player->GetPrimaryStat(), 150.0f);
-                player->CastCustomSpell(procInfo.GetProcTarget(), 81573, &damage, NULL, NULL, true);
-            }
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            player->CastCustomSpell(81573, procInfo.GetProcTarget(), &damage, NULL, NULL, true, NULL, NULL, player->GetGUID(), procInfo.GetDamageInfo()->GetSchoolMask());
         }
 
         void Register() override
@@ -4300,42 +4287,6 @@ public:
     }
 };
 
-// 81416 - t1-3 proc
-class spell_spec_tier1_3_spell_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier1_3_spell_proc() : SpellScriptLoader("spell_spec_tier1_3_spell_proc") {}
-
-    class spell_spec_tier1_3_spell_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier1_3_spell_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_3);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < (10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_3)))
-                player->AddAura(81574, player);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_3_spell_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_3_spell_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier1_3_spell_proc_AuraScript();
-    }
-};
-
 // 81419 t1-6 proc
 class spell_spec_tier1_6_spell_proc : public SpellScriptLoader
 {
@@ -4348,21 +4299,17 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_6);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER1_6);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            const SpellInfo* spell = procInfo.GetSpellInfo();
+            const SpellInfo* spell = procInfo.GetDamageInfo()->GetSpellInfo();
             if (!spell || spell->HasAreaAuraEffect())
                 return;
-            if (frand(0, 100.0f) < 1.0f + 0.04f * player->GetSkillValue(SKILL_SPEC_TIER1_6))
-            {
-                Unit* target = procInfo.GetProcTarget();
-                player->CastSpell(target, spell, TRIGGERED_FULL_MASK);
-            }
+            Unit* target = procInfo.GetProcTarget();
+            player->CastSpell(target, spell, TRIGGERED_FULL_MASK);
         }
 
         void Register() override
@@ -4375,134 +4322,6 @@ public:
     AuraScript* GetAuraScript() const override
     {
         return new spell_spec_tier1_6_spell_proc_AuraScript();
-    }
-};
-
-// 81420 t1-7 damage proc
-class spell_spec_tier1_7_damage_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier1_7_damage_proc() : SpellScriptLoader("spell_spec_tier1_7_damage_proc") {}
-
-    class spell_spec_tier1_7_damage_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier1_7_damage_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_7);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_7))
-            {
-                Unit* target = procInfo.GetProcTarget();
-                if (Aura* aura = target->GetAura(81577))
-                {
-                    if (aura->GetStackAmount() >= 1 + player->GetSkillValue(SKILL_SPEC_TIER1_7))
-                        return;
-                }
-                player->CastSpell(target, 81577, TRIGGERED_FULL_MASK);
-            }
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_7_damage_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_7_damage_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier1_7_damage_proc_AuraScript();
-    }
-};
-
-// 81579 t1-7 healing proc
-class spell_spec_tier1_7_heal_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier1_7_heal_proc() : SpellScriptLoader("spell_spec_tier1_7_heal_proc") {}
-
-    class spell_spec_tier1_7_heal_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier1_7_heal_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_7);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_7))
-            {
-                Unit* target = procInfo.GetProcTarget();
-                if (Aura* aura = target->GetAura(81578))
-                {
-                    if (aura->GetStackAmount() >= 1 + player->GetSkillValue(SKILL_SPEC_TIER1_7))
-                        return;
-                }
-                player->CastSpell(target, 81578, TRIGGERED_FULL_MASK);
-            }
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_7_heal_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_7_heal_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier1_7_heal_proc_AuraScript();
-    }
-};
-
-// 81421 t1-8 physical damage proc
-class spell_spec_tier1_8_damage_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier1_8_damage_proc() : SpellScriptLoader("spell_spec_tier1_8_damage_proc") {}
-
-    class spell_spec_tier1_8_damage_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier1_8_damage_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER1_8);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER1_8))
-            {
-                Unit* target = procInfo.GetProcTarget();
-                int32 damage = -50.0f - 0.5f * player->GetSkillValue(SKILL_SPEC_TIER1_8);
-                player->CastSpell(target, 81580, TRIGGERED_FULL_MASK);
-            }
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier1_8_damage_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier1_8_damage_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier1_8_damage_proc_AuraScript();
     }
 };
 
@@ -4519,17 +4338,14 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return (player && player->HasSkill(SKILL_SPEC_TIER2_3) && !player->HasSpellCooldown(81426));
+            return (player && player->HasSpell(SPEC_SPELL_TIER2_3) && !player->GetSpellHistory()->HasCooldown(81426));
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 5.0f + 0.05f * player->GetSkillValue(SKILL_SPEC_TIER2_3))
-            {
-                player->CastSpell(player, 81582, TRIGGERED_FULL_MASK);
-                player->AddSpellCooldown(81426, 0, time(NULL) + 60 - 0.2f * player->GetSkillValue(SKILL_SPEC_TIER2_3));
-            }
+            player->CastSpell(player, 81582, TRIGGERED_FULL_MASK);
+            player->GetSpellHistory()->AddCooldown(81426, 0, std::chrono::seconds(60));
         }
 
         void Register() override
@@ -4558,17 +4374,14 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return (player && player->HasSkill(SKILL_SPEC_TIER2_3) && !player->HasSpellCooldown(81426));
+            return (player && player->HasSpell(SPEC_SPELL_TIER2_3) && !player->GetSpellHistory()->HasCooldown(81426));
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 5.0f + 0.05f * player->GetSkillValue(SKILL_SPEC_TIER2_3))
-            {
-                player->CastSpell(player, 81583, TRIGGERED_FULL_MASK);
-                player->AddSpellCooldown(81426, 0, time(NULL) + 60 - 0.2f * player->GetSkillValue(SKILL_SPEC_TIER2_3));
-            }
+            player->CastSpell(player, 81583, TRIGGERED_FULL_MASK);
+            player->GetSpellHistory()->AddCooldown(81426, 0, std::chrono::seconds(60));
         }
 
         void Register() override
@@ -4597,9 +4410,9 @@ public:
         void HandlePeriodic(AuraEffect const* aurEff)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (!player || !player->HasSkill(SKILL_SPEC_TIER2_8) || !player->HasSpellCooldown(81431))
+            if (!player || !player->HasSpell(SPEC_SPELL_TIER2_8) || !player->GetSpellHistory()->HasCooldown(81431))
             {
-                player->AddSpellCooldown(81431, 0, time(NULL) + 60 - 0.2 * player->GetSkillValue(SKILL_SPEC_TIER2_8));
+                player->GetSpellHistory()->AddCooldown(81431, 0, std::chrono::seconds(60));
                 player->CastSpell(player, 81585, TRIGGERED_FULL_MASK);
             }
         }
@@ -4616,150 +4429,6 @@ public:
     }
 };
 
-// 81427 t2-4 proc
-class spell_spec_tier2_4_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier2_4_proc() : SpellScriptLoader("spell_spec_tier2_4_proc") {}
-
-    class spell_spec_tier2_4_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier2_4_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER2_4);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 50.0f + 0.5f * player->GetSkillValue(SKILL_SPEC_TIER2_4))
-                player->CastSpell(player, 81587, TRIGGERED_FULL_MASK);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier2_4_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier2_4_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier2_4_proc_AuraScript();
-    }
-};
-
-// 81430 t2-7 proc
-class spell_spec_tier2_7_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier2_7_proc() : SpellScriptLoader("spell_spec_tier2_7_proc") {}
-
-    class spell_spec_tier2_7_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier2_7_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER2_7);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER2_7))
-                player->CastSpell(player, 81588, TRIGGERED_FULL_MASK);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier2_7_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier2_7_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier2_7_proc_AuraScript();
-    }
-};
-
-// 81432 t2-9 proc
-class spell_spec_tier2_9_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier2_9_proc() : SpellScriptLoader("spell_spec_tier2_9_proc") {}
-
-    class spell_spec_tier2_9_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier2_9_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER2_9);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER2_9))
-                player->CastSpell(player, 81589, TRIGGERED_FULL_MASK);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier2_9_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier2_9_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier2_9_proc_AuraScript();
-    }
-};
-
-// 81433 t2-10 proc
-class spell_spec_tier2_10_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier2_10_proc() : SpellScriptLoader("spell_spec_tier2_10_proc") {}
-
-    class spell_spec_tier2_10_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier2_10_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER2_10);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 50.0f + 0.5f * player->GetSkillValue(SKILL_SPEC_TIER2_10))
-                player->CastSpell(player, 81590, TRIGGERED_FULL_MASK);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier2_10_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier2_10_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier2_10_proc_AuraScript();
-    }
-};
-
 // 81434 - spec t3-1
 class spell_spec_tier3_1_proc : public SpellScriptLoader
 {
@@ -4772,15 +4441,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_1);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER3_1);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             int32 damage = procInfo.GetDamageInfo()->GetDamage();
             Player* player = GetCaster()->ToPlayer();
-            ApplyPct(damage, 5.0f + 0.05f * player->GetSkillValue(SKILL_SPEC_TIER3_1));
+            ApplyPct(damage, aurEff->GetAmount());
             player->CastCustomSpell(procInfo.GetProcTarget(), 81591, &damage, NULL, NULL, true);
         }
 
@@ -4810,17 +4478,14 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_2) && !player->HasSpellCooldown(81434);
+            return player && player->HasSpell(SPEC_SPELL_TIER3_2) && !player->GetSpellHistory()->HasCooldown(81434);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < (30.0f + 0.3f * player->GetSkillValue(SKILL_SPEC_TIER3_2)))
-            {
-                player->CastSpell(procInfo.GetProcTarget(), 81593, true);
-                player->AddSpellCooldown(81434, 0, time(NULL) + 3);
-            }
+            player->CastSpell(procInfo.GetProcTarget(), 81593, true);
+            player->GetSpellHistory()->AddCooldown(81434, 0, std::chrono::seconds(3));
         }
 
         void Register() override
@@ -4849,17 +4514,14 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_2) && !player->HasSpellCooldown(81434);
+            return player && player->HasSpell(SPEC_SPELL_TIER3_2) && !player->GetSpellHistory()->HasCooldown(81434);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < (30.0f + 0.3f * player->GetSkillValue(SKILL_SPEC_TIER3_2)))
-            {
-                player->CastSpell(procInfo.GetProcTarget(), 81594, true);
-                player->AddSpellCooldown(81434, 0, time(NULL) + 3);
-            }
+            player->CastSpell(procInfo.GetProcTarget(), 81594, true);
+            player->GetSpellHistory()->AddCooldown(81434, 0, std::chrono::seconds(3));
         }
 
         void Register() override
@@ -4887,19 +4549,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_6);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER3_6);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < (10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER3_6)))
-            {
-                int32 damage = procInfo.GetDamageInfo()->GetDamage();
-                ApplyPct(damage, 10.0f);
-                player->CastCustomSpell(NULL, 81596, &damage, NULL, NULL, true);
-            }
+            int32 damage = procInfo.GetDamageInfo()->GetDamage();
+            ApplyPct(damage, aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(NULL, 81596, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -4927,18 +4584,16 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_7);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER3_7);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
             int32 damage = procInfo.GetDamageInfo()->GetDamage();
-            ApplyPct(damage, 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER3_7));
-            player->CastCustomSpell(procInfo.GetProcTarget(), 81598, &damage, NULL, NULL, true);
-            if (frand(0, 100.0f) < (30.0f + 0.3f * player->GetSkillValue(SKILL_SPEC_TIER3_7)))
-                player->CastSpell(procInfo.GetProcTarget(), 81597, true);
+            ApplyPct(damage, aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(procInfo.GetProcTarget(), 81598, &damage, NULL, NULL, true);
+            if (frand(0, 100.0f) < aurEff->GetSpellInfo()->Effects[0].MiscValue)
+                GetCaster()->CastSpell(procInfo.GetProcTarget(), 81597, true);
         }
 
         void Register() override
@@ -4966,16 +4621,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_8);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER3_8);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
             int32 damage = procInfo.GetDamageInfo()->GetDamage();
-            ApplyPct(damage, 20.0f + 0.2f * player->GetSkillValue(SKILL_SPEC_TIER3_8));
-            player->CastCustomSpell(procInfo.GetProcTarget(), 81600, &damage, NULL, NULL, true);
+            ApplyPct(damage, aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(procInfo.GetProcTarget(), 81600, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5003,16 +4656,14 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_8);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER3_8);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
             int32 damage = procInfo.GetDamageInfo()->GetDamage();
-            ApplyPct(damage, 20.0f + 0.2f * player->GetSkillValue(SKILL_SPEC_TIER3_8));
-            player->CastCustomSpell(procInfo.GetProcTarget(), 81601, &damage, NULL, NULL, true);
+            ApplyPct(damage, aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(procInfo.GetProcTarget(), 81601, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5025,78 +4676,6 @@ public:
     AuraScript* GetAuraScript() const override
     {
         return new spell_spec_tier3_8_heal_proc_AuraScript();
-    }
-};
-
-// 81442 - spec t3-9 damage proc
-class spell_spec_tier3_9_damage_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier3_9_damage_proc() : SpellScriptLoader("spell_spec_tier3_9_damage_proc") {}
-
-    class spell_spec_tier3_9_damage_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier3_9_damage_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_9);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 20.f + player->GetSkillValue(SKILL_SPEC_TIER3_9))
-                player->CastSpell(procInfo.GetProcTarget(), 81603, true);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier3_9_damage_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier3_9_damage_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier3_9_damage_proc_AuraScript();
-    }
-};
-
-// 81602 - spec t3-9 heal proc
-class spell_spec_tier3_9_heal_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier3_9_heal_proc() : SpellScriptLoader("spell_spec_tier3_9_heal_proc") {}
-
-    class spell_spec_tier3_9_heal_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier3_9_heal_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_9);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 20.f + player->GetSkillValue(SKILL_SPEC_TIER3_9))
-                player->CastSpell(procInfo.GetProcTarget(), 81604, true);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier3_9_heal_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier3_9_heal_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier3_9_heal_proc_AuraScript();
     }
 };
 
@@ -5113,19 +4692,16 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_10) && !player->HasSpellCooldown(81443);
+            return player && player->HasSpell(SPEC_SPELL_TIER3_10) && !player->GetSpellHistory()->HasCooldown(81443);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER3_10))
-            {
-                int32 damage = procInfo.GetDamageInfo()->GetDamage();
-                ApplyPct(damage, 10.0f);
-                player->CastCustomSpell(NULL, 81606, &damage, NULL, NULL, true);
-                player->AddSpellCooldown(81443, 0, time(NULL) + 6);
-            }
+            int32 damage = procInfo.GetDamageInfo()->GetDamage();
+            ApplyPct(damage, aurEff->GetAmount());
+            player->CastCustomSpell(NULL, 81606, &damage, NULL, NULL, true);
+            player->GetSpellHistory()->AddCooldown(81443, 0, std::chrono::seconds(6));
         }
 
         void Register() override
@@ -5154,19 +4730,16 @@ public:
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER3_10) && !player->HasSpellCooldown(81443);
+            return player && player->HasSpell(SPEC_SPELL_TIER3_10) && !player->GetSpellHistory()->HasCooldown(81443);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
             Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER3_10))
-            {
-                int32 damage = procInfo.GetDamageInfo()->GetDamage();
-                ApplyPct(damage, 10.0f);
-                player->CastCustomSpell(NULL, 81607, &damage, NULL, NULL, true);
-                player->AddSpellCooldown(81443, 0, time(NULL) + 6);
-            }
+            int32 damage = procInfo.GetDamageInfo()->GetDamage();
+            ApplyPct(damage, aurEff->GetAmount());
+            player->CastCustomSpell(NULL, 81607, &damage, NULL, NULL, true);
+            player->GetSpellHistory()->AddCooldown(81443, 0, std::chrono::seconds(6));
         }
 
         void Register() override
@@ -5194,19 +4767,13 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_1);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER4_1);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_1))
-            {
-                int32 damage = procInfo.GetDamageInfo()->GetDamage();
-                ApplyPct(damage, 10.0f + player->GetSkillValue(SKILL_SPEC_TIER4_1));
-                player->CastCustomSpell(player, 81609, &damage, NULL, NULL, true);
-            }
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetCaster(), 81609, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5234,18 +4801,13 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_2);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER4_2);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_2))
-            {
-                int32 damage = GetCaster()->CountPctFromMaxHealth(4);
-                player->CastCustomSpell(player, 81610, &damage, NULL, NULL, true);
-            }
+            int32 damage = GetCaster()->CountPctFromMaxHealth(aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetCaster(), 81610, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5273,18 +4835,13 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_3);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER4_3);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_3))
-            {
-                int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_3));
-                player->CastCustomSpell(player, 81611, &damage, NULL, NULL, true);
-            }
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetCaster(), 81611, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5312,18 +4869,13 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_3);
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER4_3);
         }
 
         void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_3))
-            {
-                int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), 10.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_3));
-                player->CastCustomSpell(procInfo.GetProcTarget(), 81611, &damage, NULL, NULL, true);
-            }
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(procInfo.GetProcTarget(), 81611, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5351,15 +4903,13 @@ public:
 
         bool HandleCheckProc(ProcEventInfo& eventInfo)
         {
-            Player* player = GetCaster()->ToPlayer();
-            return (player && player->HasSkill(SKILL_SPEC_TIER4_7));
+            return GetCaster()->HasSpell(SPEC_SPELL_TIER4_7);
         }
 
         void HandlePeriodic(AuraEffect const* aurEff)
         {
-            Player* player = GetCaster()->ToPlayer();
-            int32 damage = CalculatePct(player->GetMaxHealth(), 20.0f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_7));
-            player->CastCustomSpell(player, 81614, &damage, NULL, NULL, true);
+            int32 damage = GetCaster()->CountPctFromMaxHealth(aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetCaster(), 81614, &damage, NULL, NULL, true);
         }
 
         void Register() override
@@ -5372,78 +4922,6 @@ public:
     AuraScript* GetAuraScript() const override
     {
         return new spell_spec_tier4_7_periodic_proc_AuraScript();
-    }
-};
-
-// 81448 - spec t4-5 heal proc
-class spell_spec_tier4_5_heal_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier4_5_heal_proc() : SpellScriptLoader("spell_spec_tier4_5_heal_proc") {}
-
-    class spell_spec_tier4_5_heal_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier4_5_heal_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_5);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_5))
-                player->CastSpell(procInfo.GetProcTarget(), 81618, true);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier4_5_heal_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier4_5_heal_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier4_5_heal_proc_AuraScript();
-    }
-};
-
-// 81447 - spec t4-4 proc
-class spell_spec_tier4_4_proc : public SpellScriptLoader
-{
-public:
-    spell_spec_tier4_4_proc() : SpellScriptLoader("spell_spec_tier4_4_proc") {}
-
-    class spell_spec_tier4_4_proc_AuraScript : public AuraScript
-    {
-        PrepareAuraScript(spell_spec_tier4_4_proc_AuraScript);
-
-        bool HandleCheckProc(ProcEventInfo& eventInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            return player && player->HasSkill(SKILL_SPEC_TIER4_4);
-        }
-
-        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
-        {
-            Player* player = GetCaster()->ToPlayer();
-            if (frand(0, 100.0f) < 10.f + 0.1f * player->GetSkillValue(SKILL_SPEC_TIER4_4))
-                player->CastSpell(procInfo.GetProcTarget(), 81619, true);
-        }
-
-        void Register() override
-        {
-            DoCheckProc += AuraCheckProcFn(spell_spec_tier4_4_proc_AuraScript::HandleCheckProc);
-            OnEffectProc += AuraEffectProcFn(spell_spec_tier4_4_proc_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
-        }
-    };
-
-    AuraScript* GetAuraScript() const override
-    {
-        return new spell_spec_tier4_4_proc_AuraScript();
     }
 };
 
@@ -5514,24 +4992,24 @@ public:
     }
 };
 
-// 81878
+// 81877
 class spell_legacy_rebirth : public SpellScriptLoader
 {
 public:
     spell_legacy_rebirth() : SpellScriptLoader("spell_legacy_rebirth") {}
 
     class spell_legacy_rebirth_SpellScript : public SpellScript
-    {
+    { 
         PrepareSpellScript(spell_legacy_rebirth_SpellScript);
 
         void HandleHit()
         {
             if (Player* player = GetCaster()->ToPlayer())
             {
-                uint16 flag = AT_LOGIN_RENAME | AT_LOGIN_RESET_TALENTS | AT_LOGIN_CUSTOMIZE | AT_LOGIN_RESET_PET_TALENTS;
+                uint16 flag = (AT_LOGIN_RENAME | AT_LOGIN_RESET_TALENTS | AT_LOGIN_CUSTOMIZE | AT_LOGIN_RESET_PET_TALENTS);
+                player->SetAtLoginFlag(flag);
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
                 stmt->setUInt16(0, flag);
-                player->SetAtLoginFlag(flag);
                 stmt->setUInt32(1, player->GetGUIDLow());
                 CharacterDatabase.Execute(stmt);
                 ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(56).c_str());
@@ -5564,10 +5042,10 @@ public:
         {
             if (Player* player = GetCaster()->ToPlayer())
             {
-                uint16 flag = AT_LOGIN_CHANGE_FACTION | AT_LOGIN_CHANGE_RACE | AT_LOGIN_RENAME | AT_LOGIN_CUSTOMIZE;
+                uint16 flag = (AT_LOGIN_RENAME | AT_LOGIN_CUSTOMIZE | AT_LOGIN_CHANGE_FACTION | AT_LOGIN_CHANGE_RACE);
+                player->SetAtLoginFlag(flag);
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_ADD_AT_LOGIN_FLAG);
                 stmt->setUInt16(0, flag);
-                player->SetAtLoginFlag(flag);
                 stmt->setUInt32(1, player->GetGUIDLow());
                 CharacterDatabase.Execute(stmt);
                 ChatHandler(player->GetSession()).SendSysMessage(sObjectMgr->GetServerMessage(57).c_str());
@@ -5647,6 +5125,282 @@ public:
     SpellScript* GetSpellScript() const override
     {
         return new spell_legacy_recycle_SpellScript();
+    }
+};
+
+// 81989
+class spell_item_ascension : public SpellScriptLoader
+{
+public:
+    spell_item_ascension() : SpellScriptLoader("spell_item_ascension") {}
+    
+    class spell_item_ascension_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_ascension_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            SpellSchoolMask damageMask;
+            switch (urand(0, 2))
+            {
+                case 0:
+                    damageMask = SPELL_SCHOOL_MASK_FIRE;
+                    break;
+                case 1:
+                    damageMask = SPELL_SCHOOL_MASK_FROST;
+                    break;
+                case 2:
+                    damageMask = SPELL_SCHOOL_MASK_NATURE;
+                    break;
+            }
+            GetCaster()->CastCustomSpell(81990, procInfo.GetProcTarget(), &damage, NULL, NULL, true, NULL, NULL, GetCaster()->GetGUID(), damageMask);
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_item_ascension_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_ascension_AuraScript();
+    }
+};
+
+// 81975
+class spell_spec_tier5_1 : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_1() : SpellScriptLoader("spell_spec_tier5_1") {}
+    
+    class spell_spec_tier5_1_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_1_AuraScript);
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Player* player = GetCaster()->ToPlayer();
+            Player* victim = procInfo.GetProcTarget()->ToPlayer();
+            if (!player || !victim)
+                return;
+
+            player->CastSpell(victim, 81992, TRIGGERED_FULL_MASK);
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier5_1_AuraScript::HandleTrigger, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_1_AuraScript();
+    }
+};
+
+// 81992
+class spell_spec_tier5_1_aura_fade : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_1_aura_fade() : SpellScriptLoader("spell_spec_tier5_1_aura_fade") {}
+    
+    class spell_spec_tier5_1_aura_fade_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_1_aura_fade_AuraScript);
+
+        void HandleRemove(AuraEffect const* aurEff, AuraEffectHandleModes mode)
+        {
+            Unit* caster = GetCaster();
+            if (!caster)
+                return;
+            int32 damage = GetTarget()->CountPctFromMaxHealth(aurEff->GetAmount());
+            caster->CastCustomSpell(GetTarget(), 81993, &damage, NULL, NULL, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectRemove += AuraEffectRemoveFn(spell_spec_tier5_1_aura_fade_AuraScript::HandleRemove, EFFECT_1, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_1_aura_fade_AuraScript();
+    }
+};
+
+// 81981
+class spell_spec_tier5_7 : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_7() : SpellScriptLoader("spell_spec_tier5_7") {}
+    
+    class spell_spec_tier5_7_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_7_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            return eventInfo.GetActionTarget()->GetTypeId() == TYPEID_PLAYER;
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier5_7_AuraScript::HandleCheckProc);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_7_AuraScript();
+    }
+};
+
+// 81982
+class spell_spec_tier5_8 : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_8() : SpellScriptLoader("spell_spec_tier5_8") {}
+
+    class spell_spec_tier5_8_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_8_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            return eventInfo.GetActionTarget()->GetTypeId() == TYPEID_PLAYER;
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier5_8_AuraScript::HandleCheckProc);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_8_AuraScript();
+    }
+};
+
+// 81983
+class spell_spec_tier5_9 : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_9() : SpellScriptLoader("spell_spec_tier5_9") {}
+    
+    class spell_spec_tier5_9_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_9_AuraScript);
+        
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            return eventInfo.GetActionTarget()->GetTypeId() == TYPEID_PLAYER;
+        }
+
+        void HandleTrigger(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(procInfo.GetProcTarget(), 82003, &damage, NULL, NULL, true, NULL, NULL, GetCaster()->GetGUID());
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier5_9_AuraScript::HandleCheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_spec_tier5_9_AuraScript::HandleTrigger, EFFECT_1, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_9_AuraScript();
+    }
+};
+
+// 81984
+class spell_spec_tier5_10 : public SpellScriptLoader
+{
+public:
+    spell_spec_tier5_10() : SpellScriptLoader("spell_spec_tier5_10") {}
+
+    class spell_spec_tier5_10_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_spec_tier5_10_AuraScript);
+
+        bool HandleCheckProc(ProcEventInfo& eventInfo)
+        {
+            return eventInfo.GetActionTarget()->GetTypeId() == TYPEID_PLAYER;
+        }
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_spec_tier5_10_AuraScript::HandleCheckProc);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_spec_tier5_10_AuraScript();
+    }
+};
+
+// 82009
+class spell_item_hellion : public SpellScriptLoader
+{
+public:
+    spell_item_hellion() : SpellScriptLoader("spell_item_hellion") {}
+    
+    class spell_item_hellion_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_hellion_AuraScript);
+
+        void HandlePeriodic(AuraEffect const* aurEff)
+        {
+            int32 damage = CalculatePct(GetCaster()->GetTotalAttackPowerValue(BASE_ATTACK), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetTarget(), 82013, &damage, NULL, NULL, true);
+            GetCaster()->CastCustomSpell(GetCaster(), 82014, &damage, NULL, NULL, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectPeriodic += AuraEffectPeriodicFn(spell_item_hellion_AuraScript::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_hellion_AuraScript();
+    }
+};
+
+// 82010
+class spell_item_polaryth : public SpellScriptLoader
+{
+public:
+    spell_item_polaryth() : SpellScriptLoader("spell_item_polaryth") {}
+    
+    class spell_item_polaryth_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_item_polaryth_AuraScript);
+        
+        void HandlePeriodic(AuraEffect const* aurEff)
+        {
+            int32 damage = CalculatePct(GetCaster()->GetTotalAttackPowerValue(BASE_ATTACK), aurEff->GetAmount());
+            GetCaster()->CastCustomSpell(GetTarget(), 82013, &damage, NULL, NULL, true);
+        }
+
+        void Register() override
+        {
+            OnEffectPeriodic += AuraEffectPeriodicFn(spell_item_polaryth_AuraScript::HandlePeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_item_polaryth_AuraScript();
     }
 };
 
@@ -5740,18 +5494,10 @@ void AddSC_generic_spell_scripts()
     new spell_spec_tier1_1_heal_proc();
     new spell_spec_tier1_2_damage_proc();
     new spell_spec_tier1_2_heal_proc();
-    new spell_spec_tier1_3_spell_proc();
     new spell_spec_tier1_6_spell_proc();
-    new spell_spec_tier1_7_damage_proc();
-    new spell_spec_tier1_7_heal_proc();
-    new spell_spec_tier1_8_damage_proc();
     new spell_spec_tier2_3_attack_proc();
     new spell_spec_tier2_3_spell_proc();
     new spell_spec_tier2_8_periodic_proc();
-    new spell_spec_tier2_4_proc();
-    new spell_spec_tier2_7_proc();
-    new spell_spec_tier2_9_proc();
-    new spell_spec_tier2_10_proc();
     new spell_spec_tier3_1_proc();
     new spell_spec_tier3_2_damage_proc();
     new spell_spec_tier3_2_heal_proc();
@@ -5759,8 +5505,6 @@ void AddSC_generic_spell_scripts()
     new spell_spec_tier3_7_proc();
     new spell_spec_tier3_8_damage_proc();
     new spell_spec_tier3_8_heal_proc();
-    new spell_spec_tier3_9_damage_proc();
-    new spell_spec_tier3_9_heal_proc();
     new spell_spec_tier3_10_damage_proc();
     new spell_spec_tier3_10_heal_proc();
     new spell_spec_tier4_1_proc();
@@ -5768,12 +5512,19 @@ void AddSC_generic_spell_scripts()
     new spell_spec_tier4_3_damage_proc();
     new spell_spec_tier4_3_heal_proc();
     new spell_spec_tier4_7_periodic_proc();
-    new spell_spec_tier4_5_heal_proc();
-    new spell_spec_tier4_4_proc();
     new spell_legacy_compound();
     new spell_legacy_memory();
     new spell_legacy_rebirth();
     new spell_legacy_destruct();
     new spell_tier_3_5_proc();
     new spell_legacy_recycle();
+    new spell_item_ascension();
+    new spell_spec_tier5_1();
+    new spell_spec_tier5_1_aura_fade();
+    new spell_spec_tier5_7();
+    new spell_spec_tier5_8();
+    new spell_spec_tier5_9();
+    new spell_spec_tier5_10();
+    new spell_item_hellion();
+    new spell_item_polaryth();
 }

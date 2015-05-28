@@ -57,9 +57,13 @@ class SpellCastTargets;
 class UpdateMask;
 class CapitalCity;
 
+struct LearnableTalent;
+
 struct CharacterCustomizeInfo;
 
 typedef std::deque<Mail*> PlayerMails;
+
+#define LEGACY_START_QUEST 26036
 
 #define PLAYER_MAX_SKILLS           127
 #define PLAYER_MAX_DAILY_QUESTS     25
@@ -134,13 +138,6 @@ typedef std::unordered_map<uint32, PlayerTalent*> PlayerTalentMap;
 typedef std::unordered_map<uint32, PlayerSpell*> PlayerSpellMap;
 typedef std::list<SpellModifier*> SpellModList;
 
-struct SpellCooldown
-{
-    time_t end;
-    uint16 itemid;
-};
-
-typedef std::map<uint32, SpellCooldown> SpellCooldowns;
 typedef std::unordered_map<uint32 /*instanceId*/, time_t/*releaseTime*/> InstanceTimeMap;
 
 enum TrainerSpellState
@@ -1112,6 +1109,9 @@ private:
 
 typedef std::map<uint32, bool> CollectedMemoryMap;
 typedef std::map<uint32, uint32> AccountLootCooldownMap;
+typedef std::map<uint32, uint32> TrainedTalentMap;
+typedef std::map<uint32, bool> UpgradingSpellMap;
+typedef std::map<uint32, uint32> LearnedTalentMap;
 
 class Player : public Unit, public GridObject<Player>
 {
@@ -1686,8 +1686,6 @@ class Player : public Unit, public GridObject<Player>
         PlayerSpellMap const& GetSpellMap() const { return m_spells; }
         PlayerSpellMap      & GetSpellMap()       { return m_spells; }
 
-        SpellCooldowns const& GetSpellCooldownMap() const { return m_spellCooldowns; }
-
         void AddSpellMod(SpellModifier* mod, bool apply);
         bool IsAffectedBySpellmod(SpellInfo const* spellInfo, SpellModifier* mod, Spell* spell = NULL);
         template <class T> T ApplySpellMod(uint32 spellId, SpellModOp op, T &basevalue, Spell* spell = NULL);
@@ -1697,26 +1695,7 @@ class Player : public Unit, public GridObject<Player>
         void DropModCharge(SpellModifier* mod, Spell* spell);
         void SetSpellModTakingSpell(Spell* spell, bool apply);
 
-        static uint32 const infinityCooldownDelay = MONTH;  // used for set "infinity cooldowns" for spells and check
-        static uint32 const infinityCooldownDelayCheck = MONTH/2;
-        bool HasSpellCooldown(uint32 spell_id) const;
-        uint32 GetSpellCooldownDelay(uint32 spell_id) const;
-        void AddSpellAndCategoryCooldowns(SpellInfo const* spellInfo, uint32 itemId, Spell* spell = NULL, bool infinityCooldown = false);
-        void AddSpellCooldown(uint32 spell_id, uint32 itemid, time_t end_time);
-        void ModifySpellCooldown(uint32 spellId, int32 cooldown);
-        void SendCooldownEvent(SpellInfo const* spellInfo, uint32 itemId = 0, Spell* spell = NULL, bool setCooldown = true);
-        void ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs) override;
-        void RemoveSpellCooldown(uint32 spell_id, bool update = false);
-        void RemoveSpellCategoryCooldown(uint32 cat, bool update = false);
-        void SendClearCooldown(uint32 spell_id, Unit* target);
-
-        GlobalCooldownMgr& GetGlobalCooldownMgr() { return m_GlobalCooldownMgr; }
-
-        void RemoveCategoryCooldown(uint32 cat);
         void RemoveArenaSpellCooldowns(bool removeActivePetCooldowns = false);
-        void RemoveAllSpellCooldown();
-        void _LoadSpellCooldowns(PreparedQueryResult result);
-        void _SaveSpellCooldowns(SQLTransaction& trans);
         uint32 GetLastPotionId() { return m_lastPotionId; }
         void SetLastPotionId(uint32 item_id) { m_lastPotionId = item_id; }
         void UpdatePotionCooldown(Spell* spell = NULL);
@@ -1844,6 +1823,8 @@ class Player : public Unit, public GridObject<Player>
         float GetRatingMultiplier(CombatRating cr) const;
         float GetRatingBonusValue(CombatRating cr) const;
         uint32 GetBaseSpellPowerBonus() const { return m_baseSpellPower; }
+        uint32 GetBaseSpellDamageBonus() const { return m_baseSpellDamage; }
+        uint32 GetBaseSpellHealingBonus() const { return m_baseSpellHealing; }
         int32 GetSpellPenetrationItemMod() const { return m_spellPenetrationItemMod; }
 
         float GetExpertiseDodgeOrParryReduction(WeaponAttackType attType) const;
@@ -2007,8 +1988,6 @@ class Player : public Unit, public GridObject<Player>
         void SetArenaPoints(uint32 value);
 
         //End of PvP System
-
-        inline SpellCooldowns GetSpellCooldowns() const { return m_spellCooldowns; }
 
         void SetDrunkValue(uint8 newDrunkValue, uint32 itemId = 0);
         uint8 GetDrunkValue() const { return GetByteValue(PLAYER_BYTES_3, 1); }
@@ -2343,6 +2322,7 @@ class Player : public Unit, public GridObject<Player>
         void StartTimedAchievement(AchievementCriteriaTimedTypes type, uint32 entry, uint32 timeLost = 0);
         void RemoveTimedAchievement(AchievementCriteriaTimedTypes type, uint32 entry);
         void CompletedAchievement(AchievementEntry const* entry);
+        void CompleteAchievement(uint32 entry);
 
         bool HasTitle(uint32 bitIndex) const;
         bool HasTitle(CharTitlesEntry const* title) const { return HasTitle(title->bit_index); }
@@ -2421,8 +2401,41 @@ class Player : public Unit, public GridObject<Player>
         void AddLootCooldown(uint32 item);
         void RemoveLootCooldown(uint32 item);
         void UpdateLootCooldown(uint32 diff);
+
+        void InitSpellUpgradeInfoForLevel();
+        void LearnedNewSpell(uint32 spell);
+        void LearnNewSpell();
+        uint32 RollNextSpell() const;
+        bool CanLevelUp() const;
+        void ConsumeXP();
+        void AddSpellsForLevel();
+        void UpgradingNextSpell();
+        void SetCanLearnTalent(bool canLearn) { m_CanLearnTalent = canLearn; }
+        bool CanLearnTalent() { return m_CanLearnTalent; }
+        bool LearnTalentToLevel();
+        void AddGuildSpells();
+        void RemoveGuildSpells();
+
+        void LearnRandomTalentForLevel();
+        bool HasLearnedTalent(uint32 firstTalent, uint32 rank) const;
+        void LearnNewTalent(const LearnableTalent* talent);
+        bool IsTalentLearnable(const LearnableTalent* talent) const;
+        int32 GetPreferedTalentCategory() const { return m_PreferedTalentCategory; }
+        void SetPreperedTalentCategory(int32 talent) { m_PreferedTalentCategory = talent; }
+        int32 GetFreeTalentCount() const;
+        uint32 GetSpentTalentCount() const;
+        void ResetLearnedTalent();
+
+        ObjectGuid GetLastSelectedTarget() const { return m_LastSelectTarget; }
+        void SetLastSelectedTarget(ObjectGuid targetGuid) { m_LastSelectTarget = targetGuid; }
     private:
         AccountLootCooldownMap m_AccountLootCooldownMap;
+        uint32 m_UpgradingSpell;
+        UpgradingSpellMap m_UpgradingSpellListForCurrentLevel;
+        LearnedTalentMap m_LearnedTalentMap;
+        bool m_CanLearnTalent;
+        int32 m_PreferedTalentCategory;
+        ObjectGuid m_LastSelectTarget;
 
         /*********************************************************/
         /***                  CAPITAL CITY                     ***/
@@ -2522,6 +2535,8 @@ class Player : public Unit, public GridObject<Player>
         void _LoadInstanceTimeRestrictions(PreparedQueryResult result);
         void _LoadSupremacyStats(uint32 guid);
         void _LoadCollectedMemory(uint32 guid);
+        void _LoadLearnedSpells(uint32 guid);
+        void _LoadLearnedTalents(uint32 guid);
 
         /*********************************************************/
         /***                   SAVE SYSTEM                     ***/
@@ -2545,6 +2560,7 @@ class Player : public Unit, public GridObject<Player>
         void _SaveStats(SQLTransaction& trans);
         void _SaveInstanceTimeRestrictions(SQLTransaction& trans);
         void _SaveSupremacyStats(SQLTransaction& trans);
+        void _SaveLearnedSpells(SQLTransaction& trans);
 
         /*********************************************************/
         /***              ENVIRONMENTAL SYSTEM                 ***/
@@ -2600,8 +2616,6 @@ class Player : public Unit, public GridObject<Player>
         PlayerTalentMap* m_talents[MAX_TALENT_SPECS];
         uint32 m_lastPotionId;                              // last used health/mana potion in combat, that block next potion use
 
-        GlobalCooldownMgr m_GlobalCooldownMgr;
-
         uint8 m_activeSpec;
         uint8 m_specsCount;
 
@@ -2612,6 +2626,8 @@ class Player : public Unit, public GridObject<Player>
         float m_auraBaseMod[BASEMOD_END][MOD_END];
         int16 m_baseRatingValue[MAX_COMBAT_RATING];
         uint32 m_baseSpellPower;
+        uint32 m_baseSpellDamage;
+        uint32 m_baseSpellHealing;
         uint32 m_baseFeralAP;
         uint32 m_baseManaRegen;
         uint32 m_baseHealthRegen;
@@ -2768,8 +2784,6 @@ class Player : public Unit, public GridObject<Player>
 
         AchievementMgr* m_achievementMgr;
         ReputationMgr*  m_reputationMgr;
-
-        SpellCooldowns m_spellCooldowns;
 
         uint32 m_ChampioningFaction;
 

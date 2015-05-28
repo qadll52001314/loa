@@ -25,6 +25,7 @@
 #include "ScriptMgr.h"
 #include "GridNotifiers.h"
 #include "Unit.h"
+#include "SpellHistory.h"
 #include "SpellScript.h"
 #include "SpellAuraEffects.h"
 
@@ -338,7 +339,7 @@ class spell_sha_earth_shield : public SpellScriptLoader
             {
                 //! HACK due to currenct proc system implementation
                 if (Player* player = GetTarget()->ToPlayer())
-                    if (player->HasSpellCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL))
+                    if (player->GetSpellHistory()->HasCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL))
                         return false;
                 return true;
             }
@@ -351,7 +352,7 @@ class spell_sha_earth_shield : public SpellScriptLoader
 
                 /// @hack: due to currenct proc system implementation
                 if (Player* player = GetTarget()->ToPlayer())
-                    player->AddSpellCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL, 0, time(NULL) + 3);
+                    player->GetSpellHistory()->AddCooldown(SPELL_SHAMAN_EARTH_SHIELD_HEAL, 0, std::chrono::seconds(3));
             }
 
             void Register() override
@@ -804,7 +805,7 @@ class spell_sha_item_t10_elemental_2p_bonus : public SpellScriptLoader
             {
                 PreventDefaultAction();
                 if (Player* target = GetTarget()->ToPlayer())
-                    target->ModifySpellCooldown(SPELL_SHAMAN_ELEMENTAL_MASTERY, -aurEff->GetAmount());
+                    target->GetSpellHistory()->ModifyCooldown(SPELL_SHAMAN_ELEMENTAL_MASTERY, -aurEff->GetAmount());
             }
 
             void Register() override
@@ -1024,6 +1025,162 @@ class spell_sha_thunderstorm : public SpellScriptLoader
         }
 };
 
+// 82073
+class spell_sha_echo_of_the_storm : public SpellScriptLoader
+{
+public:
+    spell_sha_echo_of_the_storm() : SpellScriptLoader("spell_sha_echo_of_the_storm") {}
+    
+    class spell_sha_echo_of_the_storm_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_sha_echo_of_the_storm_AuraScript);
+        
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            Unit* target = procInfo.GetProcTarget();
+            int32 damage = CalculatePct(procInfo.GetDamageInfo()->GetDamage(), aurEff->GetAmount());
+            caster->CastCustomSpell(82077, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), &damage, NULL, NULL, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_sha_echo_of_the_storm_AuraScript::HandleProc, EFFECT_1, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_sha_echo_of_the_storm_AuraScript();
+    }
+};
+
+// 82078
+class spell_sha_rage_of_the_thunder_spell_proc : public SpellScriptLoader
+{
+public:
+    spell_sha_rage_of_the_thunder_spell_proc() : SpellScriptLoader("spell_sha_rage_of_the_thunder_spell_proc") {}
+    
+    class spell_sha_rage_of_the_thunder_spell_proc_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_sha_rage_of_the_thunder_spell_proc_AuraScript);
+        
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            GetCaster()->CastSpell(GetCaster(), 82079, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_sha_rage_of_the_thunder_spell_proc_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_sha_rage_of_the_thunder_spell_proc_AuraScript();
+    }
+};
+
+// 82079
+class spell_sha_rage_of_the_thunder : public SpellScriptLoader
+{
+public:
+    spell_sha_rage_of_the_thunder() : SpellScriptLoader("spell_sha_rage_of_the_thunder") {}
+    
+    class spell_sha_rage_of_the_thunder_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_sha_rage_of_the_thunder_AuraScript);
+        
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            Unit* caster = GetCaster();
+            Unit* victim = procInfo.GetProcTarget();
+
+            if (caster->HasAura(82078))
+                return;
+            uint8 count = aurEff->GetBase()->GetStackAmount();
+            for (uint8 i = 1; i <= count; ++i)
+            {
+                caster->CastSpell(victim, 82080, true);
+                caster->CastSpell(caster, 82081, true);
+            }
+            aurEff->GetBase()->Remove();
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_sha_rage_of_the_thunder_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_sha_rage_of_the_thunder_AuraScript();
+    }
+};
+
+// 82075
+class spell_sha_rest_of_the_spirits : public SpellScriptLoader
+{
+public:
+    spell_sha_rest_of_the_spirits() : SpellScriptLoader("spell_sha_rest_of_the_spirits") {}
+    
+    class spell_sha_rest_of_the_spirits_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_sha_rest_of_the_spirits_AuraScript);
+        
+        void HandleProc(AuraEffect const* aurEff, ProcEventInfo& procInfo)
+        {
+            int32 damage = aurEff->GetAmount();
+            int32 damage2 = 10;
+
+            Unit* target = procInfo.GetProcTarget();
+
+            GetCaster()->CastCustomSpell(82082, target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), &damage, &damage2, NULL, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectProc += AuraEffectProcFn(spell_sha_rest_of_the_spirits_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_sha_rest_of_the_spirits_AuraScript();
+    }
+};
+
+// 82076
+class spell_sha_spiritual_heal : public SpellScriptLoader
+{
+public:
+    spell_sha_spiritual_heal() : SpellScriptLoader("spell_sha_spiritual_heal") {}
+    
+    class spell_sha_spiritual_heal_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_sha_spiritual_heal_AuraScript);
+        
+        void HandlePeriodic(AuraEffect const* aurEff)
+        {
+            Unit* caster = GetCaster();
+            int32 damage = caster->GetStat(STAT_SPIRIT);
+            caster->CastCustomSpell(caster, 82083, &damage, NULL, NULL, true);
+        }
+        
+        void Register() override
+        {
+            OnEffectPeriodic += AuraEffectPeriodicFn(spell_sha_spiritual_heal_AuraScript::HandlePeriodic, EFFECT_2, SPELL_AURA_PERIODIC_DUMMY);
+        }
+    };
+    
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_sha_spiritual_heal_AuraScript();
+    }
+};
+
 void AddSC_shaman_spell_scripts()
 {
     new spell_sha_ancestral_awakening_proc();
@@ -1047,4 +1204,9 @@ void AddSC_shaman_spell_scripts()
     new spell_sha_mana_tide_totem();
     new spell_sha_sentry_totem();
     new spell_sha_thunderstorm();
+    new spell_sha_echo_of_the_storm();
+    new spell_sha_rage_of_the_thunder();
+    new spell_sha_rage_of_the_thunder_spell_proc();
+    new spell_sha_rest_of_the_spirits();
+    new spell_sha_spiritual_heal();
 }
